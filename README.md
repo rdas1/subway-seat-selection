@@ -142,3 +142,19 @@ The frontend is configured to proxy API requests through Vite. API calls to `/ap
 
 MIT
 
+
+## Hot Module Reloading (HMR)
+
+Both backend and frontend support HMR:
+
+### Backend HMR ✅
+- Already configured in `docker-compose.yml`
+- Uses `uvicorn --reload` flag
+- Code changes in `backend/` will automatically reload the server
+
+### Frontend HMR ✅
+- Development mode uses Vite dev server with HMR
+- Code changes in `frontend/src/` will automatically update in the browser
+- Access frontend at: http://localhost:5173 (development) or http://localhost (production build)
+
+**Note:** The development setup uses Vite dev server on port 5173. For production builds, use the production docker-compose file or run `npm run build` locally.

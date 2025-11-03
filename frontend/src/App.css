@@ -1,26 +1,123 @@
 .App {
-  text-align: center;
+  min-height: 100vh;
+  background-color: #121213;
+  color: white;
+  display: flex;
+  flex-direction: column;
 }
 
 .App-header {
-  background-color: #282c34;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background-color: #121213;
   padding: 20px;
   color: white;
-  min-height: 100vh;
+  text-align: center;
+  border-bottom: 1px solid #3a3a3c;
+}
+
+.header-top {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: calc(10px + 2vmin);
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
 }
 
 .App-header h1 {
-  margin: 0 0 20px 0;
+  margin: 0;
+  font-size: 2rem;
 }
 
 .App-header p {
   margin: 0;
   font-size: 1rem;
   opacity: 0.8;
+  color: #d7dadc;
+}
+
+
+.gender-dropdown {
+  padding: 6px 12px;
+  background-color: #3a3a3c;
+  color: #d7dadc;
+  border: 1px solid #565658;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.gender-dropdown:hover {
+  background-color: #4a4a4c;
+  border-color: #6a6a6c;
+}
+
+.gender-dropdown:focus {
+  outline: 2px solid #d7dadc;
+  outline-offset: 2px;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  margin-top: 15px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-tile {
+  width: 24px;
+  height: 24px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.tile-legend-eligible {
+  background-color: coral;
+}
+
+.tile-legend-door {
+  background-color: #3a3a3c;
+  border-left: 3px solid white;
+}
+
+.legend-label {
+  font-size: 0.85rem;
+  color: #d7dadc;
+}
+
+.App-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.seat-selection-app {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.selection-info {
+  margin-top: 20px;
+  padding: 12px 20px;
+  background-color: #3a3a3c;
+  border-radius: 4px;
+  color: #d7dadc;
+  font-size: 1rem;
 }
 

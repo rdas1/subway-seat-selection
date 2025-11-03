@@ -23,7 +23,8 @@ app = FastAPI(
 )
 
 # Configure CORS - support multiple origins from environment variable
-cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:5173")
+# Default includes both development (Vite) and production (nginx) ports
+cors_origins_env = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:80,http://localhost")
 cors_origins = [origin.strip() for origin in cors_origins_env.split(",")]
 if "*" in cors_origins:
     cors_origins = ["*"]

@@ -39,21 +39,26 @@ services:
       - subway-network
     restart: unless-stopped
 
-  # React Frontend
+  # React Frontend (Development with HMR)
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
       args:
-        VITE_API_URL: /api
+        VITE_API_URL: http://localhost:8000/api
     container_name: subway-frontend
     ports:
-      - "80:80"
+      - "5173:5173"  # Vite dev server port
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules  # Exclude node_modules from bind mount
     depends_on:
       - backend
     networks:
       - subway-network
     restart: unless-stopped
+    environment:
+      - CHOKIDAR_USEPOLLING=true  # Enable file watching in Docker
 
 volumes:
   postgres_data:

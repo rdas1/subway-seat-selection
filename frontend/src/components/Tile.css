@@ -1,0 +1,82 @@
+.tile {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  cursor: default;
+  border: 2px solid transparent;
+}
+
+.tile-default {
+  background-color: #121213; /* Wordle black */
+}
+
+.tile-floor {
+  background-color: #3a3a3c; /* Dark gray for floor tiles */
+}
+
+.tile-eligible {
+  background-color: coral; /* Wordle orange */
+  cursor: pointer;
+}
+
+/* Keep floor tiles dark gray even when eligible */
+.tile-floor.tile-eligible {
+  background-color: #3a3a3c;
+}
+
+.tile-floor.tile-eligible:hover {
+  background-color: #4a4a4c; /* Slightly lighter gray on hover */
+  transform: scale(1.05);
+}
+
+.tile-eligible:hover {
+  background-color: #ff8c52;
+  transform: scale(1.05);
+}
+
+.tile-eligible:focus {
+  /* outline: 2px solid #ffffff; */
+  outline-offset: 2px;
+}
+
+.tile-selected {
+  /* z-index: 100; */
+  border: 3px solid gray;
+  background-color: #40db40 !important; /* Light green for selected tiles */
+  /* box-shadow: 0 0 0 2px #f5793a; */
+  /* background-color: gray !important;
+  border: 2px solid #40db40 !important;
+  box-shadow: 0 0 0 2px #40db40 !important; */
+}
+
+.tile-occupied {
+  /* background-color: red; */
+  background-color: gray;
+  opacity: 0.8;
+}
+
+.tile-person {
+  font-size: 1.5rem;
+  display: block;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.tile-door-left {
+  /* Outer edge: left border for door tiles in column 0 */
+  border-left: 4px solid white;
+  transition: border-left 0.3s ease;
+}
+
+.tile-door-right {
+  /* Outer edge: right border for door tiles in last column */
+  border-right: 4px solid white;
+  transition: border-right 0.3s ease;
+}
+
