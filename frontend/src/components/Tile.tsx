@@ -41,6 +41,10 @@ export default function Tile({ tile, onClick, isEligible, isSelected, playerEmoj
       classes.push('tile-occupied');
     }
     
+    if (tile.isStanchion) {
+      classes.push('tile-stanchion');
+    }
+    
     if (tile.isDoor && !doorsOpen) {
       classes.push('tile-door');
       // Add specific class for outer edges (only when doors are closed)

@@ -10,9 +10,10 @@ interface GridProps {
   selectedTile?: { row: number; col: number } | null;
   playerGender: PlayerGender;
   doorsOpen: boolean;
+  animationState?: 'idle' | 'slidingIn' | 'slidingOut';
 }
 
-export default function Grid({ grid, onTileClick, selectedTile, playerGender, doorsOpen }: GridProps) {
+export default function Grid({ grid, onTileClick, selectedTile, playerGender, doorsOpen, animationState = 'idle' }: GridProps) {
   const isSelected = (row: number, col: number): boolean => {
     return selectedTile !== null && 
            selectedTile !== undefined && 
@@ -20,9 +21,15 @@ export default function Grid({ grid, onTileClick, selectedTile, playerGender, do
            selectedTile.col === col;
   };
 
+  const getAnimationClass = () => {
+    if (animationState === 'slidingIn') return 'grid-sliding-in';
+    if (animationState === 'slidingOut') return 'grid-sliding-out';
+    return '';
+  };
+
   return (
     <div 
-      className="grid-container hide-scrollbar"
+      className={`grid-container hide-scrollbar ${getAnimationClass()}`}
       style={{
         gridTemplateColumns: `repeat(${grid.width}, 1fr)`,
         gridTemplateRows: `repeat(${grid.height}, 1fr)`,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SubwayGrid } from '../classes/SubwayGrid';
 import { PlayerGender } from '../App';
 import Grid from './Grid';
@@ -6,11 +6,31 @@ import Grid from './Grid';
 interface SeatSelectionAppProps {
   initialGrid: SubwayGrid;
   playerGender: PlayerGender;
+  onSelectionChange?: (selectedTile: { row: number; col: number } | null) => void;
+  clearSelectionTrigger?: number;
+  animationState?: 'idle' | 'slidingIn' | 'slidingOut';
 }
 
-export default function SeatSelectionApp({ initialGrid, playerGender }: SeatSelectionAppProps) {
-  const [grid] = useState<SubwayGrid>(initialGrid);
+export default function SeatSelectionApp({ initialGrid, playerGender, onSelectionChange, clearSelectionTrigger, animationState = 'idle' }: SeatSelectionAppProps) {
+  const [grid, setGrid] = useState<SubwayGrid>(initialGrid);
   const [selectedTile, setSelectedTile] = useState<{ row: number; col: number } | null>(null);
+  
+  // Update grid when initialGrid prop changes
+  useEffect(() => {
+    setGrid(initialGrid);
+    setSelectedTile(null); // Clear selection when grid changes
+    onSelectionChange?.(null); // Notify parent that selection is cleared
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialGrid]);
+
+  // Clear selection when clearSelectionTrigger changes
+  useEffect(() => {
+    if (clearSelectionTrigger && clearSelectionTrigger > 0 && selectedTile !== null) {
+      setSelectedTile(null);
+      onSelectionChange?.(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clearSelectionTrigger]);
   const [doorsOpen, setDoorsOpen] = useState<boolean>(false);
 
   // Methods to open and close doors
@@ -30,10 +50,14 @@ export default function SeatSelectionApp({ initialGrid, playerGender }: SeatSele
     if (grid.isEligibleSeat(row, col)) {
       // If clicking the same tile that's already selected, unselect it
       if (selectedTile && selectedTile.row === row && selectedTile.col === col) {
-        setSelectedTile(null);
+        const newSelection = null;
+        setSelectedTile(newSelection);
+        onSelectionChange?.(newSelection);
         console.log(`Unselected seat at row ${row}, col ${col}`);
       } else {
-        setSelectedTile({ row, col });
+        const newSelection = { row, col };
+        setSelectedTile(newSelection);
+        onSelectionChange?.(newSelection);
         // TODO: Send selection to backend API
         console.log(`Selected seat at row ${row}, col ${col}`);
       }
@@ -48,6 +72,7 @@ export default function SeatSelectionApp({ initialGrid, playerGender }: SeatSele
         selectedTile={selectedTile}
         playerGender={playerGender}
         doorsOpen={doorsOpen}
+        animationState={animationState}
       />
       {selectedTile && (
         <div className="selection-info">
