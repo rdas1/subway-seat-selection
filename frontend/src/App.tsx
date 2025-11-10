@@ -62,11 +62,7 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <div className="header-top">
-          <h1>Your train is here!</h1>
-        </div>
         <div className="subtitle-row">
-          <p>Time to find your seat.</p>
           <button 
             className="legend-toggle" 
             onClick={() => setLegendExpanded(!legendExpanded)}
@@ -120,6 +116,10 @@ function App() {
         </div>
       </header>
       <main className="App-main">
+        <div className="main-header">
+          <h1>Your train is here!</h1>
+          <h2>Where will you sit (or stand)?</h2>
+        </div>
         <SeatSelectionApp 
           initialGrid={grid} 
           playerGender={playerGender}

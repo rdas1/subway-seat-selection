@@ -11,30 +11,30 @@
 }
 
 .tile-default {
-  background-color: #121213; /* Wordle black */
+  background-color: var(--grid-bg-default);
 }
 
 .tile-floor {
-  background-color: #3a3a3c; /* Dark gray for floor tiles */
+  background-color: var(--grid-bg-floor);
 }
 
 .tile-eligible {
-  background-color: coral; /* Wordle orange */
+  background-color: var(--seat-eligible);
   cursor: pointer;
 }
 
 /* Keep floor tiles dark gray even when eligible */
 .tile-floor.tile-eligible {
-  background-color: #3a3a3c;
+  background-color: var(--grid-bg-floor);
 }
 
 .tile-floor.tile-eligible:hover {
-  background-color: #4a4a4c; /* Slightly lighter gray on hover */
+  background-color: var(--grid-bg-floor-hover);
   transform: scale(1.05);
 }
 
 .tile-eligible:hover {
-  background-color: #ff8c52;
+  background-color: var(--seat-eligible-hover);
   transform: scale(1.05);
 }
 
@@ -45,24 +45,33 @@
 
 .tile-selected {
   /* z-index: 100; */
-  border: 3px solid gray;
-  background-color: green !important; 
-  /* Light green for selected tiles */
-  /* box-shadow: 0 0 0 2px #f5793a; */
-  /* background-color: gray !important;
-  border: 2px solid #40db40 !important;
-  box-shadow: 0 0 0 2px #40db40 !important; */
+  background-color: var(--selected-bg) !important;
+  border: 3px solid var(--selected-border) !important;
+  /* Dark green background with blue border to indicate it's a seat */
 }
 
 .tile-occupied {
-  /* background-color: red; */
-  background-color: red;
-  opacity: 0.8;
+  background-color: var(--seat-eligible) !important;
+  border: 2px solid var(--occupied-border) !important;
+  /* Occupied seats keep blue background with red outline */
 }
 
 .tile-floor.tile-occupied {
-  background-color: #3a3a3c !important; /* Dark gray for floor tiles */
-  border: 2px solid red !important;
+  background-color: var(--grid-bg-floor) !important;
+  border: 2px solid var(--occupied-floor-border) !important;
+  /* Occupied floor positions outlined in gray */
+}
+
+.tile-selected.tile-occupied {
+  background-color: var(--selected-bg) !important;
+  border: 3px solid var(--selected-border) !important;
+  /* Dark green background with blue border when selected and occupied */
+}
+
+.tile-selected.tile-floor.tile-occupied {
+  background-color: var(--selected-bg) !important;
+  border: 3px solid var(--occupied-floor-border) !important;
+  /* Dark green background with gray border for selected occupied floor tiles */
 }
 
 .tile-person {
@@ -76,13 +85,13 @@
 
 .tile-door-left {
   /* Outer edge: left border for door tiles in column 0 */
-  border-left: 4px solid white;
+  border-left: 4px solid var(--door-border);
   transition: border-left 0.3s ease;
 }
 
 .tile-door-right {
   /* Outer edge: right border for door tiles in last column */
-  border-right: 4px solid white;
+  border-right: 4px solid var(--door-border);
   transition: border-right 0.3s ease;
 }
 
@@ -95,8 +104,8 @@
 .tile-stanchion::after {
   content: '';
   position: absolute;
-  background-color: white;
-  opacity: 0.6;
+  background-color: var(--stanchion-color);
+  opacity: var(--stanchion-opacity);
 }
 
 .tile-stanchion::before {
@@ -105,8 +114,9 @@
   left: 20%;
   right: 20%;
   height: 2px;
-  border-top: 1px dotted white;
-  border-bottom: 1px dotted white;
+  border-top: 1px dotted;
+  border-bottom: 1px dotted;
+  border-color: var(--stanchion-color);
   transform: translateY(-50%);
 }
 
@@ -116,8 +126,35 @@
   top: 20%;
   bottom: 20%;
   width: 2px;
-  border-left: 1px dotted white;
-  border-right: 1px dotted white;
+  border-left: 1px dotted;
+  border-right: 1px dotted;
+  border-color: var(--stanchion-color);
   transform: translateX(-50%);
+}
+
+.tile-platform-caution {
+  background-color: var(--platform-caution) !important;
+}
+
+.tile-platform-caution.tile-eligible:hover {
+  background-color: var(--platform-caution-hover) !important;
+}
+
+.tile-platform-caution.tile-occupied {
+  background-color: var(--grid-bg-floor) !important;
+  border: 2px solid var(--platform-caution) !important;
+  /* Occupied caution positions: gray background with yellow outline */
+}
+
+.tile-selected.tile-platform-caution {
+  background-color: var(--grid-bg-floor) !important;
+  border: 3px solid var(--platform-caution) !important;
+  /* Gray background with yellow outline for selected platform caution tiles */
+}
+
+.tile-selected.tile-platform-caution.tile-occupied {
+  background-color: var(--grid-bg-floor) !important;
+  border: 3px solid var(--platform-caution) !important;
+  /* Gray background with yellow outline for selected occupied platform caution tiles */
 }
 

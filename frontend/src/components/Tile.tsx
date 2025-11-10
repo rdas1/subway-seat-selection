@@ -11,9 +11,10 @@ interface TileProps {
   colIndex: number;
   gridWidth: number;
   doorsOpen: boolean;
+  isPlatformCaution?: boolean;
 }
 
-export default function Tile({ tile, onClick, isEligible, isSelected, playerEmoji, colIndex, gridWidth, doorsOpen }: TileProps) {
+export default function Tile({ tile, onClick, isEligible, isSelected, playerEmoji, colIndex, gridWidth, doorsOpen, isPlatformCaution = false }: TileProps) {
   const handleClick = () => {
     if (isEligible) {
       onClick();
@@ -54,6 +55,10 @@ export default function Tile({ tile, onClick, isEligible, isSelected, playerEmoj
       if (colIndex === gridWidth - 1) {
         classes.push('tile-door-right');
       }
+    }
+    
+    if (isPlatformCaution) {
+      classes.push('tile-platform-caution');
     }
 
     return classes.join(' ');

@@ -17,19 +17,6 @@
   border-bottom: 1px solid #3a3a3c;
 }
 
-.header-top {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  flex-wrap: wrap;
-  margin-bottom: 6px;
-}
-
-.App-header h1 {
-  margin: 0;
-  font-size: 1.5rem;
-}
 
 .subtitle-row {
   display: flex;
@@ -39,12 +26,6 @@
   flex-wrap: wrap;
 }
 
-.App-header p {
-  margin: 0;
-  font-size: 0.9rem;
-  opacity: 0.8;
-  color: #d7dadc;
-}
 
 
 .gender-dropdown {
@@ -126,25 +107,25 @@
 }
 
 .tile-legend-eligible-seat {
-  background-color: coral;
+  background-color: var(--seat-eligible);
 }
 
 .tile-legend-eligible-floor {
-  background-color: #3a3a3c;
+  background-color: var(--grid-bg-floor);
 }
 
 .tile-legend-door-left {
-  background-color: #3a3a3c;
-  border-left: 3px solid white;
+  background-color: var(--grid-bg-floor);
+  border-left: 3px solid var(--door-border);
 }
 
 .tile-legend-door-right {
-  background-color: #3a3a3c;
-  border-right: 3px solid white;
+  background-color: var(--grid-bg-floor);
+  border-right: 3px solid var(--door-border);
 }
 
 .tile-legend-stanchion {
-  background-color: #3a3a3c;
+  background-color: var(--grid-bg-floor);
   position: relative;
 }
 
@@ -153,8 +134,8 @@
 .tile-legend-stanchion::after {
   content: '';
   position: absolute;
-  background-color: white;
-  opacity: 0.6;
+  background-color: var(--stanchion-color);
+  opacity: var(--stanchion-opacity);
 }
 
 .tile-legend-stanchion::before {
@@ -163,8 +144,9 @@
   left: 25%;
   right: 25%;
   height: 1px;
-  border-top: 1px dotted white;
-  border-bottom: 1px dotted white;
+  border-top: 1px dotted;
+  border-bottom: 1px dotted;
+  border-color: var(--stanchion-color);
   transform: translateY(-50%);
 }
 
@@ -174,22 +156,23 @@
   top: 25%;
   bottom: 25%;
   width: 1px;
-  border-left: 1px dotted white;
-  border-right: 1px dotted white;
+  border-left: 1px dotted;
+  border-right: 1px dotted;
+  border-color: var(--stanchion-color);
   transform: translateX(-50%);
 }
 
 .tile-legend-occupied {
-  background-color: red;
-  opacity: 0.8;
+  border: 2px solid var(--occupied-border);
+  background-color: var(--seat-eligible);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .tile-legend-occupied-floor {
-  background-color: #3a3a3c !important; /* Dark gray for floor tiles */
-  border: 2px solid red !important;
+  background-color: var(--grid-bg-floor) !important;
+  border: 2px solid var(--occupied-floor-border) !important;
 }
 
 .legend-emoji {
@@ -213,11 +196,38 @@
   padding: 20px;
 }
 
+.main-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.main-header h1 {
+  margin: 0 0 8px 0;
+  font-size: 1.5rem;
+}
+
+.main-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  opacity: 0.8;
+  color: #d7dadc;
+}
+
 .seat-selection-app {
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+.grids-container {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: center;
+  gap: 20px;
+  width: 100%;
+  max-width: 100%;
 }
 
 .selection-info {

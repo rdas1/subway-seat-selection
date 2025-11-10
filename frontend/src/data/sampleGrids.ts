@@ -143,4 +143,63 @@ export const createSampleGrid1 = (percentFilled: number = 0.6): SubwayGrid => {
   return new SubwayGrid(20, 5, tiles);
 };
 
+// Platform grid: same height as train grid, but only floor tiles (standing positions)
+export const createPlatformGrid = (height: number, width: number = 3, percentFilled: number = 0.1): SubwayGrid => {
+  const tiles: Tile[][] = [];
+  
+  // Create rows (same height as train grid)
+  for (let row = 0; row < height; row++) {
+    const rowTiles: Tile[] = [];
+    
+    // Create columns (all floor tiles)
+    for (let col = 0; col < width; col++) {
+      // Add stanchions roughly every 3 rows in the middle column
+      const isStanchion = col === Math.floor(width / 2) && row % 3 === 2;
+      rowTiles.push({ 
+        type: 'floor', 
+        occupied: false,
+        isStanchion: isStanchion
+      });
+    }
+    
+    tiles.push(rowTiles);
+  }
+
+  // Randomly populate some floor tiles
+  const personTypes: ('man' | 'woman')[] = ['man', 'woman'];
+  const floorTiles: { row: number; col: number; tile: Tile }[] = [];
+  
+  // Collect all floor tiles (excluding stanchions)
+  for (let row = 0; row < height; row++) {
+    for (let col = 0; col < width; col++) {
+      const tile = tiles[row][col];
+      if (tile.type === 'floor' && !tile.isStanchion) {
+        floorTiles.push({ row, col, tile });
+      }
+    }
+  }
+  
+  // Randomly shuffle and select floor tiles to fill
+  const numFloorTilesToFill = Math.floor(floorTiles.length * percentFilled);
+  
+  // Shuffle floor array using Fisher-Yates algorithm
+  for (let i = floorTiles.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [floorTiles[i], floorTiles[j]] = [floorTiles[j], floorTiles[i]];
+  }
+  
+  // Fill the selected floor tiles with random people
+  for (let i = 0; i < numFloorTilesToFill; i++) {
+    const { row, col } = floorTiles[i];
+    const randomPerson = personTypes[Math.floor(Math.random() * personTypes.length)];
+    tiles[row][col] = {
+      ...tiles[row][col],
+      occupied: true,
+      person: randomPerson
+    };
+  }
+
+  return new SubwayGrid(height, width, tiles);
+};
+
 export const sampleGrid = createSampleGrid1();

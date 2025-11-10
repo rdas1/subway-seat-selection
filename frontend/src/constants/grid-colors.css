@@ -1,0 +1,32 @@
+:root {
+  /* Grid background colors */
+  --grid-bg-default: #121213; /* Wordle black */
+  --grid-bg-container: #1a1a1b; /* Grid container background */
+  --grid-bg-floor: #3a3a3c; /* Dark gray for floor tiles */
+  --grid-bg-floor-hover: #4a4a4c; /* Slightly lighter gray on hover */
+  
+  /* Seat colors */
+  --seat-eligible: #5ba3d0; /* Medium blue for unoccupied seats */
+  --seat-eligible-hover: #7bb8d9; /* Lighter blue on hover */
+  
+  /* Occupied colors */
+  --occupied-bg: red;
+  --occupied-border: red;
+  --occupied-floor-border: #808080; /* Gray border for occupied floor positions */
+  
+  /* Selection colors */
+  --selected-bg: #006400; /* Dark green for selected tiles */
+  --selected-border: #5ba3d0; /* Blue border to indicate it's a seat (matches seat color) */
+  
+  /* Platform caution colors */
+  --platform-caution: #ffd700; /* Yellow for platform caution section */
+  --platform-caution-hover: #ffed4e; /* Slightly brighter yellow on hover */
+  
+  /* Door colors */
+  --door-border: white;
+  
+  /* Stanchion colors */
+  --stanchion-color: white;
+  --stanchion-opacity: 0.6;
+}
+
