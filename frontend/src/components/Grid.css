@@ -64,3 +64,16 @@
   max-width: 20vw;
 }
 
+.track-container {
+  /* Transparent track placeholder - maintains layout but invisible */
+  background-color: transparent !important;
+  pointer-events: none; /* Make it non-interactive */
+}
+
+.track-container .tile {
+  /* Make all tiles in track transparent and non-interactive */
+  opacity: 0;
+  pointer-events: none;
+  cursor: default;
+}
+

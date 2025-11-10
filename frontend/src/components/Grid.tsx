@@ -11,9 +11,10 @@ interface GridProps {
   playerGender: PlayerGender;
   doorsOpen: boolean;
   animationState?: 'idle' | 'slidingIn' | 'slidingOut';
+  isTrack?: boolean;
 }
 
-export default function Grid({ grid, onTileClick, selectedTile, playerGender, doorsOpen, animationState = 'idle' }: GridProps) {
+export default function Grid({ grid, onTileClick, selectedTile, playerGender, doorsOpen, animationState = 'idle', isTrack = false }: GridProps) {
   const isSelected = (row: number, col: number): boolean => {
     return selectedTile !== null && 
            selectedTile !== undefined && 
@@ -29,7 +30,7 @@ export default function Grid({ grid, onTileClick, selectedTile, playerGender, do
 
   return (
     <div 
-      className={`grid-container hide-scrollbar ${getAnimationClass()}`}
+      className={`grid-container hide-scrollbar ${getAnimationClass()} ${isTrack ? 'track-container' : ''}`}
       style={{
         gridTemplateColumns: `repeat(${grid.width}, 1fr)`,
         gridTemplateRows: `repeat(${grid.height}, 1fr)`,
@@ -40,10 +41,10 @@ export default function Grid({ grid, onTileClick, selectedTile, playerGender, do
           <Tile
             key={`${rowIndex}-${colIndex}`}
             tile={tile}
-            onClick={() => onTileClick(rowIndex, colIndex)}
-            isEligible={grid.isEligibleSeat(rowIndex, colIndex)}
-            isSelected={isSelected(rowIndex, colIndex)}
-            playerEmoji={isSelected(rowIndex, colIndex) ? getPlayerEmoji(playerGender) : undefined}
+            onClick={() => !isTrack && onTileClick(rowIndex, colIndex)}
+            isEligible={!isTrack && grid.isEligibleSeat(rowIndex, colIndex)}
+            isSelected={!isTrack && isSelected(rowIndex, colIndex)}
+            playerEmoji={!isTrack && isSelected(rowIndex, colIndex) ? getPlayerEmoji(playerGender) : undefined}
             colIndex={colIndex}
             gridWidth={grid.width}
             doorsOpen={doorsOpen}

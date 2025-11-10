@@ -4,16 +4,22 @@ import SeatSelectionApp from './components/SeatSelectionApp'
 import { createSampleGrid1 } from './data/sampleGrids'
 import { SubwayGrid } from './classes/SubwayGrid'
 import { EMOJI_MAN, EMOJI_WOMAN, EMOJI_NEUTRAL } from './constants/emojis'
+import { getRandomTrainDelay } from './constants/train'
 
 export type PlayerGender = 'man' | 'woman' | 'neutral'
 
 function App() {
   const [playerGender, setPlayerGender] = useState<PlayerGender>('neutral')
   const [selectedTile, setSelectedTile] = useState<{ row: number; col: number } | null>(null)
-  const [grid, setGrid] = useState<SubwayGrid>(createSampleGrid1())
+  const [selectionType, setSelectionType] = useState<'train' | 'platform' | null>(null)
+  const [grid, setGrid] = useState<SubwayGrid | null>(null)
   const [clearSelectionTrigger, setClearSelectionTrigger] = useState<number>(0)
+  const [platformRecreateTrigger, setPlatformRecreateTrigger] = useState<number>(0)
   const [legendExpanded, setLegendExpanded] = useState<boolean>(false)
-  const [gridAnimation, setGridAnimation] = useState<'idle' | 'slidingIn' | 'slidingOut'>('slidingIn')
+  const [gridAnimation, setGridAnimation] = useState<'idle' | 'slidingIn' | 'slidingOut'>('idle')
+  const [countdown, setCountdown] = useState<number | null>(null)
+  const [trainArrived, setTrainArrived] = useState<boolean>(false)
+  const [isTrainActive, setIsTrainActive] = useState<boolean>(false)
 
   // Collapse legend by default on mobile
   useEffect(() => {
@@ -24,6 +30,39 @@ function App() {
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+
+  // Initialize countdown on mount
+  useEffect(() => {
+    const delay = getRandomTrainDelay()
+    setCountdown(delay)
+    setTrainArrived(false)
+    setIsTrainActive(true) // Mark train as active so countdown can trigger arrival
+  }, [])
+
+  // Countdown timer
+  useEffect(() => {
+    if (countdown === null || countdown <= 0) {
+      if (countdown === 0 && isTrainActive) {
+        // Train has arrived and train is active
+        setTrainArrived(true)
+        if (!grid) {
+          setGrid(createSampleGrid1())
+        }
+        setGridAnimation('slidingIn')
+        // Set animation to idle after slide-in
+        setTimeout(() => {
+          setGridAnimation('idle')
+        }, 600)
+      }
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown(countdown - 1)
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [countdown, grid, isTrainActive])
 
   // Set animation to idle after initial slide-in
   useEffect(() => {
@@ -36,21 +75,34 @@ function App() {
   }, [gridAnimation])
 
   const handleContinue = () => {
-    if (selectedTile) {
-      // Start slide-out animation
+    // Start slide-out animation if train is visible
+    if (trainArrived && grid) {
+      setIsTrainActive(false) // Mark train as inactive immediately
       setGridAnimation('slidingOut')
-      // After animation completes, generate new grid and slide in
+      // After animation completes, start new countdown
       setTimeout(() => {
-        setGrid(createSampleGrid1())
+        setGrid(null)
         setSelectedTile(null)
-        setGridAnimation('slidingIn')
-        // After slide-in completes, set back to idle
-        setTimeout(() => {
-          setGridAnimation('idle')
-        }, 600) // Match animation duration
+        setTrainArrived(false)
+        setGridAnimation('idle')
+        // Recreate platform when train leaves
+        setPlatformRecreateTrigger(prev => prev + 1)
+        // Generate random delay for next train
+        const delay = getRandomTrainDelay()
+        setCountdown(delay)
+        // Mark train as active again so countdown can trigger arrival
+        setIsTrainActive(true)
       }, 600) // Match animation duration
-      console.log('Generated new grid')
+    } else {
+      // If train hasn't arrived yet, just reset countdown
+      setIsTrainActive(true) // Mark train as active
+      const delay = getRandomTrainDelay()
+      setCountdown(delay)
+      setTrainArrived(false)
+      setGrid(null)
+      setSelectedTile(null)
     }
+    console.log('Waiting for next train')
   }
 
   const handleClearSelection = () => {
@@ -117,27 +169,45 @@ function App() {
       </header>
       <main className="App-main">
         <div className="main-header">
-          <h1>Your train is here!</h1>
-          <h2>Where will you sit (or stand)?</h2>
+          {trainArrived && grid ? (
+            <>
+              <h1>Your train is here!</h1>
+              <h2>Where will you sit (or stand)?</h2>
+            </>
+          ) : (
+            <>
+              <h1>Your train is arriving in {countdown ?? '...'} {countdown === 1 ? 'second' : 'seconds'}</h1>
+              <h2>Where will you sit (or stand)?</h2>
+            </>
+          )}
         </div>
         <SeatSelectionApp 
           initialGrid={grid} 
           playerGender={playerGender}
           onSelectionChange={setSelectedTile}
+          onSelectionTypeChange={setSelectionType}
           clearSelectionTrigger={clearSelectionTrigger}
+          platformRecreateTrigger={platformRecreateTrigger}
           animationState={gridAnimation}
+          showTrain={trainArrived && isTrainActive}
         />
       </main>
-      {selectedTile && (
-        <footer className="App-footer">
-          <button className="clear-button" onClick={handleClearSelection}>
-            Clear Selection
-          </button>
+      <footer className="App-footer">
+        {selectionType === 'train' ? (
+          <>
+            <button className="clear-button" onClick={handleClearSelection}>
+              Clear Selection
+            </button>
+            <button className="continue-button" onClick={handleContinue}>
+              Continue
+            </button>
+          </>
+        ) : (
           <button className="continue-button" onClick={handleContinue}>
-            Continue
+            Wait for the next train
           </button>
-        </footer>
-      )}
+        )}
+      </footer>
     </div>
   )
 }

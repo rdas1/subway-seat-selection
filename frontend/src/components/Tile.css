@@ -46,13 +46,12 @@
 .tile-selected {
   /* z-index: 100; */
   background-color: var(--selected-bg) !important;
-  border: 3px solid var(--selected-border) !important;
   /* Dark green background with blue border to indicate it's a seat */
 }
 
 .tile-occupied {
   background-color: var(--seat-eligible) !important;
-  border: 2px solid var(--occupied-border) !important;
+  border: 2px solid var(--occupied-floor-border) !important;
   /* Occupied seats keep blue background with red outline */
 }
 
@@ -147,7 +146,7 @@
 }
 
 .tile-selected.tile-platform-caution {
-  background-color: var(--grid-bg-floor) !important;
+  background-color: var(--selected-bg) !important;
   border: 3px solid var(--platform-caution) !important;
   /* Gray background with yellow outline for selected platform caution tiles */
 }
