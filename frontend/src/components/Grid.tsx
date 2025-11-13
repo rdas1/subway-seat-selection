@@ -12,9 +12,13 @@ interface GridProps {
   doorsOpen: boolean;
   animationState?: 'idle' | 'slidingIn' | 'slidingOut';
   isTrack?: boolean;
+  editMode?: boolean; // If true, all tiles are clickable regardless of eligibility
+  onDragStart?: (row: number, col: number, e: React.DragEvent) => void;
+  onDragOver?: (row: number, col: number, e: React.DragEvent) => void;
+  onDrop?: (row: number, col: number, e: React.DragEvent) => void;
 }
 
-export default function Grid({ grid, onTileClick, selectedTile, playerGender, doorsOpen, animationState = 'idle', isTrack = false }: GridProps) {
+export default function Grid({ grid, onTileClick, selectedTile, playerGender, doorsOpen, animationState = 'idle', isTrack = false, editMode = false, onDragStart, onDragOver, onDrop }: GridProps) {
   const isSelected = (row: number, col: number): boolean => {
     return selectedTile !== null && 
            selectedTile !== undefined && 
@@ -42,12 +46,17 @@ export default function Grid({ grid, onTileClick, selectedTile, playerGender, do
             key={`${rowIndex}-${colIndex}`}
             tile={tile}
             onClick={() => !isTrack && onTileClick(rowIndex, colIndex)}
-            isEligible={!isTrack && grid.isEligibleSeat(rowIndex, colIndex)}
-            isSelected={!isTrack && isSelected(rowIndex, colIndex)}
-            playerEmoji={!isTrack && isSelected(rowIndex, colIndex) ? getPlayerEmoji(playerGender) : undefined}
+            isEligible={!isTrack && (editMode || grid.isEligibleSeat(rowIndex, colIndex))}
+            isSelected={!isTrack && !editMode && isSelected(rowIndex, colIndex)}
+            playerEmoji={!isTrack && !editMode && isSelected(rowIndex, colIndex) ? getPlayerEmoji(playerGender) : undefined}
             colIndex={colIndex}
             gridWidth={grid.width}
             doorsOpen={doorsOpen}
+            editMode={editMode}
+            draggable={editMode && tile.occupied && tile.person !== undefined}
+            onDragStart={editMode && tile.occupied && tile.person !== undefined && onDragStart ? (e) => onDragStart(rowIndex, colIndex, e) : undefined}
+            onDragOver={editMode && onDragOver ? (e) => onDragOver(rowIndex, colIndex, e) : undefined}
+            onDrop={editMode && onDrop ? (e) => onDrop(rowIndex, colIndex, e) : undefined}
           />
         ))
       )}

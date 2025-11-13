@@ -20,7 +20,7 @@ export class SubwayGrid {
 
   isEligibleSeat(row: number, col: number): boolean {
     const tile = this.getTile(row, col);
-    return tile !== null && !tile.occupied && !tile.isStanchion;
+    return tile !== null && tile.type !== 'barrier' && !tile.occupied && !tile.isStanchion;
   }
 }
 

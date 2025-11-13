@@ -1,5 +1,5 @@
 import { Tile as TileType } from '../types/grid';
-import { EMOJI_MAN, EMOJI_WOMAN, EMOJI_CHILD } from '../constants/emojis';
+import { EMOJI_MAN, EMOJI_WOMAN, EMOJI_CHILD, EMOJI_NEUTRAL } from '../constants/emojis';
 import './Tile.css';
 
 interface TileProps {
@@ -12,9 +12,14 @@ interface TileProps {
   gridWidth: number;
   doorsOpen: boolean;
   isPlatformCaution?: boolean;
+  editMode?: boolean;
+  onDragStart?: (e: React.DragEvent) => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDrop?: (e: React.DragEvent) => void;
+  draggable?: boolean;
 }
 
-export default function Tile({ tile, onClick, isEligible, isSelected, playerEmoji, colIndex, gridWidth, doorsOpen, isPlatformCaution = false }: TileProps) {
+export default function Tile({ tile, onClick, isEligible, isSelected, playerEmoji, colIndex, gridWidth, doorsOpen, isPlatformCaution = false, editMode = false, onDragStart, onDragOver, onDrop, draggable = false }: TileProps) {
   const handleClick = () => {
     if (isEligible) {
       onClick();
@@ -26,6 +31,8 @@ export default function Tile({ tile, onClick, isEligible, isSelected, playerEmoj
     
     if (tile.type === 'floor') {
       classes.push('tile-floor');
+    } else if (tile.type === 'barrier') {
+      classes.push('tile-barrier');
     } else {
       classes.push('tile-default');
     }
@@ -70,13 +77,19 @@ export default function Tile({ tile, onClick, isEligible, isSelected, playerEmoj
       onClick={handleClick}
       role={isEligible ? 'button' : undefined}
       tabIndex={isEligible ? 0 : undefined}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
       aria-label={
         isEligible
-          ? `Available ${tile.type === 'floor' ? 'floor' : 'seat'} - click to select`
+          ? `Available ${tile.type === 'floor' ? 'floor' : tile.type === 'barrier' ? 'barrier' : 'seat'} - click to select`
           : tile.occupied
-          ? `Occupied ${tile.type === 'floor' ? 'floor' : 'seat'}`
+          ? `Occupied ${tile.type === 'floor' ? 'floor' : tile.type === 'barrier' ? 'barrier' : 'seat'}`
           : tile.type === 'floor'
           ? 'Floor'
+          : tile.type === 'barrier'
+          ? 'Barrier'
           : 'Seat'
       }
     >
@@ -87,7 +100,7 @@ export default function Tile({ tile, onClick, isEligible, isSelected, playerEmoj
       )}
       {!isSelected && tile.occupied && tile.person && (
         <span className="tile-person" aria-label={tile.person}>
-          {tile.person === 'man' ? EMOJI_MAN : tile.person === 'woman' ? EMOJI_WOMAN : EMOJI_CHILD}
+          {tile.person === 'man' ? EMOJI_MAN : tile.person === 'woman' ? EMOJI_WOMAN : tile.person === 'neutral' ? EMOJI_NEUTRAL : EMOJI_CHILD}
         </span>
       )}
     </div>

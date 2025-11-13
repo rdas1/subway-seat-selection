@@ -10,12 +10,26 @@
   border: 2px solid transparent;
 }
 
+.tile[draggable="true"] {
+  cursor: grab;
+}
+
+.tile[draggable="true"]:active {
+  cursor: grabbing;
+  opacity: 0.7;
+}
+
 .tile-default {
   background-color: var(--grid-bg-default);
 }
 
 .tile-floor {
   background-color: var(--grid-bg-floor);
+}
+
+.tile-barrier {
+  background-color: #d3d3d3; /* Light grey */
+  cursor: default;
 }
 
 .tile-eligible {
@@ -26,6 +40,17 @@
 /* Keep floor tiles dark gray even when eligible */
 .tile-floor.tile-eligible {
   background-color: var(--grid-bg-floor);
+}
+
+/* Keep barriers light grey even when eligible */
+.tile-barrier.tile-eligible {
+  background-color: #d3d3d3 !important; /* Light grey - override eligible blue */
+  cursor: pointer;
+}
+
+.tile-barrier.tile-eligible:hover {
+  background-color: #c0c0c0 !important; /* Slightly darker grey on hover */
+  transform: scale(1.05);
 }
 
 .tile-floor.tile-eligible:hover {
@@ -61,6 +86,11 @@
   /* Occupied floor positions outlined in gray */
 }
 
+.tile-barrier.tile-occupied {
+  background-color: #d3d3d3 !important; /* Keep barrier grey even when occupied */
+  border: 2px solid var(--occupied-floor-border) !important;
+}
+
 .tile-selected.tile-occupied {
   background-color: var(--selected-bg) !important;
   border: 3px solid var(--selected-border) !important;
@@ -71,6 +101,16 @@
   background-color: var(--selected-bg) !important;
   border: 3px solid var(--occupied-floor-border) !important;
   /* Dark green background with gray border for selected occupied floor tiles */
+}
+
+.tile-selected.tile-barrier {
+  background-color: #d3d3d3 !important; /* Keep barrier grey even when selected */
+  border: 3px solid var(--selected-border) !important;
+}
+
+.tile-selected.tile-barrier.tile-occupied {
+  background-color: #d3d3d3 !important; /* Keep barrier grey even when selected and occupied */
+  border: 3px solid var(--occupied-floor-border) !important;
 }
 
 .tile-person {

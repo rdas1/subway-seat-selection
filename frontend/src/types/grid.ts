@@ -1,6 +1,6 @@
-export type TileType = 'seat' | 'floor';
+export type TileType = 'seat' | 'floor' | 'barrier';
 
-export type PersonType = 'man' | 'woman' | 'child' | null;
+export type PersonType = 'man' | 'woman' | 'child' | 'neutral' | null;
 
 export interface Tile {
   type: TileType;

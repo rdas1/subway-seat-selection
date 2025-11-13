@@ -63,3 +63,55 @@ Test the database connection:
 curl http://localhost:8000/db-test
 ```
 
+## API Endpoints
+
+### Train Configurations
+
+- **POST `/train-configurations`** - Create a new train configuration
+  - Body: `TrainConfigurationCreate` (name, height, width, tiles)
+  - Returns: `TrainConfigurationResponse`
+
+- **GET `/train-configurations`** - List all train configurations
+  - Query params: `skip` (default: 0), `limit` (default: 100)
+  - Returns: List of `TrainConfigurationResponse`
+
+- **GET `/train-configurations/{config_id}`** - Get a specific train configuration
+  - Returns: `TrainConfigurationResponse`
+
+- **GET `/train-configurations/{config_id}/statistics`** - Get response statistics for a configuration
+  - Returns: `ResponseStatistics` (total responses, seat/floor counts, heatmap)
+
+### User Responses
+
+- **POST `/user-responses`** - Submit a user response (where they chose to sit/stand)
+  - Body: `UserResponseCreate` (train_configuration_id, row, col, selection_type, user_session_id, user_id)
+  - Returns: `UserResponseResponse`
+
+- **GET `/user-responses`** - List user responses with optional filtering
+  - Query params: `train_configuration_id`, `user_session_id`, `user_id`, `skip`, `limit`
+  - Returns: List of `UserResponseResponse`
+
+- **GET `/user-responses/{response_id}`** - Get a specific user response
+  - Returns: `UserResponseResponse`
+
+## Data Models
+
+### TrainConfiguration
+Stores train grid configurations with:
+- `id`: Unique identifier
+- `name`: Optional name/description
+- `height`: Grid height (rows)
+- `width`: Grid width (columns)
+- `tiles`: 2D array of tiles stored as JSON
+- `created_at`, `updated_at`: Timestamps
+
+### UserResponse
+Stores individual user selections with:
+- `id`: Unique identifier
+- `train_configuration_id`: Reference to the train configuration
+- `row`, `col`: Position of the selection
+- `selection_type`: "seat" or "floor"
+- `user_session_id`: Optional session identifier
+- `user_id`: Optional user identifier
+- `created_at`: Timestamp
+
