@@ -13,7 +13,7 @@ function Navigation() {
     <nav className="main-navigation">
       <div className="nav-container">
         <Link to="/" className="nav-logo">
-          🚇 Subway Seat Selection
+          Subway Simulator
         </Link>
         <div className="nav-links">
           <Link 

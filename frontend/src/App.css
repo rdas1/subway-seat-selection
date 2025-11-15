@@ -110,7 +110,7 @@
   padding: 12px 20px 8px 20px;
   color: white;
   text-align: center;
-  border-bottom: 1px solid #3a3a3c;
+  /* Removed border-bottom */
 }
 
 
@@ -143,6 +143,11 @@
 .gender-dropdown:focus {
   outline: 2px solid #d7dadc;
   outline-offset: 2px;
+}
+
+.legend-section {
+  margin-bottom: 12px;
+  text-align: center;
 }
 
 .legend-container {
@@ -294,19 +299,17 @@
 
 .main-header {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .main-header h1 {
-  margin: 0 0 8px 0;
+  margin: 0;
   font-size: 1.5rem;
 }
 
-.main-header h2 {
+.main-header-prompt {
   margin: 0;
-  font-size: 1.2rem;
-  opacity: 0.8;
-  color: #d7dadc;
+  color: white;
 }
 
 .seat-selection-app {

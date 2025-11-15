@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import SeatSelectionApp from '../components/SeatSelectionApp'
 import StatisticsView from '../components/StatisticsView'
+import Legend from '../components/Legend'
 import { SubwayGrid } from '../classes/SubwayGrid'
-import { EMOJI_MAN, EMOJI_WOMAN, EMOJI_NEUTRAL } from '../constants/emojis'
 import { getRandomTrainDelay } from '../constants/train'
 import { PlayerGender } from '../App'
 import { trainConfigApi, userResponseApi } from '../services/api'
@@ -18,7 +18,6 @@ export default function ScenarioPage() {
   const [grid, setGrid] = useState<SubwayGrid | null>(null)
   const [clearSelectionTrigger, setClearSelectionTrigger] = useState<number>(0)
   const [platformRecreateTrigger, setPlatformRecreateTrigger] = useState<number>(0)
-  const [legendExpanded, setLegendExpanded] = useState<boolean>(false)
   const [gridAnimation, setGridAnimation] = useState<'idle' | 'slidingIn' | 'slidingOut'>('idle')
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
@@ -35,19 +34,10 @@ export default function ScenarioPage() {
     floor_selections: number
     selection_heatmap: Record<string, number>
   } | null>(null)
+  const [userSelection, setUserSelection] = useState<{ row: number; col: number } | null>(null)
 
   // Check URL for results parameter
   const showResults = searchParams.get('results') === 'true'
-
-  // Collapse legend by default on mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      setLegendExpanded(window.innerWidth >= 768) // Expanded by default on desktop
-    }
-    checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
-  }, [])
 
   // Load statistics when results parameter is present
   useEffect(() => {
@@ -219,6 +209,9 @@ export default function ScenarioPage() {
           console.log('POST request successful:', response)
           console.log('Response saved to database with ID:', response.id)
           
+          // Store user's selection before navigating to results
+          setUserSelection({ row: selectedTile.row, col: selectedTile.col })
+          
           // Fetch statistics and navigate to results
           try {
             const stats = await trainConfigApi.getStatistics(scenarioId)
@@ -276,6 +269,7 @@ export default function ScenarioPage() {
         setError(null)
         setSubmitSuccess(false)
         setStatistics(null)
+        setUserSelection(null)
         // Navigate to /scenario without ID to trigger countdown and random scenario
         navigate('/scenario', { replace: true })
         // Recreate platform when train leaves
@@ -297,6 +291,7 @@ export default function ScenarioPage() {
       setScenarioId(null)
       setScenarioName(null)
       setStatistics(null)
+      setUserSelection(null)
       // Navigate to /scenario without ID to trigger countdown
       navigate('/scenario', { replace: true })
     }
@@ -310,18 +305,23 @@ export default function ScenarioPage() {
     setError(null)
     setSelectedTile(null)
     
-    // Start slide-out animation
-    if (grid) {
+    // Store grid state before clearing
+    const hadGrid = !!grid
+    
+    // Clear grid immediately to show countdown/platform right away
+    setGrid(null)
+    setTrainArrived(false)
+    setScenarioId(null)
+    setScenarioName(null)
+    setUserSelection(null)
+    
+    // Start slide-out animation if grid was visible
+    if (hadGrid) {
       setIsTrainActive(false)
       setGridAnimation('slidingOut')
       // After animation completes, navigate to /scenario (no ID) to trigger countdown
       setTimeout(() => {
-        setGrid(null)
-        setTrainArrived(false)
         setGridAnimation('idle')
-        setScenarioId(null)
-        setScenarioName(null)
-        setStatistics(null)
         // Navigate to /scenario without ID to trigger countdown and random scenario
         navigate('/scenario', { replace: true })
         // Recreate platform when train leaves
@@ -332,6 +332,13 @@ export default function ScenarioPage() {
         // Mark train as active again so countdown can trigger arrival
         setIsTrainActive(true)
       }, 600) // Match animation duration
+    } else {
+      // If no grid, immediately navigate and start countdown
+      navigate('/scenario', { replace: true })
+      setPlatformRecreateTrigger(prev => prev + 1)
+      const delay = getRandomTrainDelay()
+      setCountdown(delay)
+      setIsTrainActive(true)
     }
   }
 
@@ -351,7 +358,6 @@ export default function ScenarioPage() {
     return (
       <div className="App">
         <div className="loading-message">
-          <p>Loading scenario...</p>
         </div>
       </div>
     )
@@ -370,88 +376,44 @@ export default function ScenarioPage() {
 
   return (
     <div className="App">
-      <header className="App-header">
-        <div className="subtitle-row">
-          <button 
-            className="legend-toggle" 
-            onClick={() => setLegendExpanded(!legendExpanded)}
-            aria-expanded={legendExpanded}
-            aria-label={legendExpanded ? 'Collapse legend' : 'Expand legend'}
-          >
-            <span className="legend-toggle-label">Legend</span>
-            <span className="legend-toggle-icon">{legendExpanded ? '▼' : '▶'}</span>
-          </button>
-        </div>
-        <div className="legend-container">
-          {legendExpanded && (
-            <div className="legend">
-              <div className="legend-item">
-                <span className="legend-label">You:</span>
-                <select
-                  id="gender-select"
-                  value={playerGender}
-                  onChange={(e) => setPlayerGender(e.target.value as PlayerGender)}
-                  className="gender-dropdown"
-                >
-                  <option value="man">{EMOJI_MAN} Man</option>
-                  <option value="woman">{EMOJI_WOMAN} Woman</option>
-                  <option value="neutral">{EMOJI_NEUTRAL} Gender Neutral</option>
-                </select>
-              </div>
-              <div className="legend-item">
-                <div className="legend-tile tile-legend-eligible-seat"></div>
-                <span className="legend-label">Available Seat</span>
-              </div>
-              <div className="legend-item">
-                <div className="legend-tile tile-legend-eligible-floor"></div>
-                <span className="legend-label">Available Floor</span>
-              </div>
-              <div className="legend-item">
-                <div className="legend-tile tile-legend-door-left"></div>
-                <div className="legend-tile tile-legend-door-right"></div>
-                <span className="legend-label">Door</span>
-              </div>
-              <div className="legend-item">
-                <div className="legend-tile tile-legend-stanchion"></div>
-                <span className="legend-label">Stanchion</span>
-              </div>
-              <div className="legend-item">
-                <div className="legend-tile tile-legend-occupied"></div>
-                <div className="legend-tile tile-legend-occupied-floor"></div>
-                <span className="legend-label">Occupied</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </header>
       <main className="App-main">
         <div className="main-header">
           {showResults && statistics ? (
             <>
-              {scenarioName && <h1>{scenarioName}</h1>}
+              <h1>Results</h1>
+              {scenarioName && <h2>{scenarioName}</h2>}
             </>
           ) : grid ? (
             <>
               {scenarioName && <h1>{scenarioName}</h1>}
-              <h2>Where will you sit (or stand)?</h2>
+              <h1 className="main-header-prompt">Where would you sit (or stand)?</h1>
+            </>
+          ) : countdown && countdown > 0 ? (
+            <>
+              <h1>Your train is arriving in {countdown ?? '...'} {countdown === 1 ? 'second' : 'seconds'}</h1>
             </>
           ) : (
             <>
-              <h1>Your train is arriving in {countdown ?? '...'} {countdown === 1 ? 'second' : 'seconds'}</h1>
-              <h2>Where will you sit (or stand)?</h2>
+              <h1>Your train is on its way!</h1>
             </>
           )}
         </div>
+        {!showResults && (
+          <Legend 
+            playerGender={playerGender}
+            onGenderChange={setPlayerGender}
+          />
+        )}
         {showResults && statistics && grid && scenarioId ? (
           <StatisticsView 
             grid={grid} 
             scenarioId={scenarioId}
             statistics={statistics}
             onStatisticsUpdate={setStatistics}
+            userSelection={userSelection}
           />
         ) : showResults ? (
           <div className="loading-message">
-            <p>Loading statistics...</p>
           </div>
         ) : (
           <SeatSelectionApp 

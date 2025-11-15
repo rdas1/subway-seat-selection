@@ -136,6 +136,18 @@ export default function SeatSelectionApp({ initialGrid, playerGender, onSelectio
   (window as any).openDoors = openDoors;
   (window as any).closeDoors = closeDoors;
 
+  // Open doors after train slides in
+  useEffect(() => {
+    if (animationState === 'slidingIn') {
+      // Wait for animation to complete (600ms) then open doors
+      const timer = setTimeout(() => {
+        console.log('Opening doors');
+        openDoors();
+      }, 610);
+      return () => clearTimeout(timer);
+    }
+  }, [animationState]);
+
   const handleTileClick = (row: number, col: number) => {
     if (grid && grid.isEligibleSeat(row, col)) {
       // If clicking the same tile that's already selected, unselect it
