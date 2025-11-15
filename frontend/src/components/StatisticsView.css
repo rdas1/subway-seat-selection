@@ -1,0 +1,191 @@
+.statistics-view {
+  padding: 20px;
+  width: 100%;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.statistics-view .statistics-filters {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.statistics-view .filter-label {
+  font-weight: 500;
+  color: #333;
+}
+
+.statistics-view .gender-filter-select {
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+font-size: 1em;
+  /* background-color: white; */
+  cursor: pointer;
+  /* color: #000; */
+}
+
+.statistics-view .gender-filter-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.statistics-view .loading-indicator {
+  color: #666;
+  font-size: 0.9em;
+  font-style: italic;
+}
+
+.statistics-view .statistics-grid-wrapper {
+  position: relative;
+  min-width: 20vw;
+  max-width: 50vw;
+}
+
+.statistics-view .statistics-grid-container {
+  position: relative;
+}
+
+.statistics-view .statistics-grid-container .grid-container {
+  position: relative;
+}
+
+.statistics-view .statistics-heatmap-overlays {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  display: grid;
+  gap: 2px;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.statistics-view .statistics-tile-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.statistics-view .statistics-panel {
+  min-width: 10vw;
+  max-width: 20vw;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 20px;
+  background-color: var(--grid-bg-container, #2a2a2c);
+  border-radius: 8px;
+}
+
+.statistics-view .statistics-summary {
+  margin-bottom: 0;
+}
+
+.statistics-view .statistics-summary h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: white;
+}
+
+.statistics-view .statistics-summary p {
+  margin: 8px 0;
+  color: #d7dadc;
+}
+
+.statistics-view .heatmap-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0.75;
+  z-index: 101;
+  pointer-events: none;
+  border-radius: 2px;
+  transition: opacity 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.statistics-view .response-count-text {
+  color: white;
+  font-weight: bold;
+  font-size: 1.1em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  z-index: 102;
+}
+
+.statistics-view .heatmap-overlay.heatmap-ineligible {
+  background-color: #000;
+  opacity: 0.7;
+}
+
+.statistics-view .heatmap-overlay.heatmap-unchosen {
+  background-color: #000 !important;
+  opacity: 0.7;
+}
+
+.statistics-view .heatmap-overlay.heatmap-unchosen-seat {
+  background-color: #000 !important;
+  opacity: 0.7;
+  border: 2px solid #3b82f6; /* Blue outline */
+  box-sizing: border-box;
+}
+
+.statistics-view .statistics-tile-wrapper:hover .heatmap-overlay {
+  opacity: 0.9;
+}
+
+.statistics-view .statistics-tile-wrapper:hover .heatmap-overlay.heatmap-ineligible {
+  opacity: 0.85;
+}
+
+/* Legacy styles for text-based heatmap (keeping for backwards compatibility) */
+.statistics-view .heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.statistics-view .heatmap-item {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+  color: #000;
+}
+
+.statistics-view .heatmap-item strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .statistics-view .statistics-grid-wrapper {
+    min-width: 100%;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .statistics-view .statistics-panel {
+    min-width: 100%;
+    max-width: 100%;
+    width: 100%;
+    order: -1; /* Move statistics panel above grid on mobile */
+    margin-bottom: 20px;
+  }
+
+  .statistics-view .grids-container {
+    flex-direction: column;
+  }
+}
+

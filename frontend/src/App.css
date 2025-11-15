@@ -72,6 +72,34 @@
     width: 100%;
     justify-content: center;
   }
+
+  /* Hide platform on mobile */
+  .platform-container {
+    display: none !important;
+  }
+
+  /* Make grids container stack vertically on mobile */
+  .grids-container {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 0;
+    margin: 0 auto;
+  }
+
+  /* Ensure seat-selection-app is centered on mobile */
+  .seat-selection-app {
+    width: 100%;
+    padding: 0;
+    margin: 0 auto;
+  }
+
+  /* Ensure App-main doesn't have padding causing offset */
+  .App-main {
+    padding-left: 0;
+    padding-right: 0;
+  }
 }
 
 .App-header {

@@ -1,10 +1,11 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text, select
+from sqlalchemy import text, select, func
 from contextlib import asynccontextmanager
 from typing import List, Optional
 import os
+import random
 from database import init_db, close_db, get_db
 from models import Base, TrainConfiguration, UserResponse
 from schemas import (
@@ -130,6 +131,45 @@ async def list_train_configurations(
     return configurations
 
 
+@app.get("/train-configurations/random", response_model=TrainConfigurationResponse)
+async def get_random_train_configuration(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get a random train configuration.
+    """
+    # First, get the count of configurations
+    count_result = await db.execute(
+        select(func.count(TrainConfiguration.id))
+    )
+    count = count_result.scalar_one()
+    
+    if count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No train configurations found"
+        )
+    
+    # Get a random offset
+    random_offset = random.randint(0, count - 1)
+    
+    # Fetch the configuration at that offset
+    result = await db.execute(
+        select(TrainConfiguration)
+        .offset(random_offset)
+        .limit(1)
+    )
+    config = result.scalar_one_or_none()
+    
+    if config is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Failed to retrieve random train configuration"
+        )
+    
+    return config
+
+
 @app.get("/train-configurations/{config_id}", response_model=TrainConfigurationResponse)
 async def get_train_configuration(
     config_id: int,
@@ -187,7 +227,8 @@ async def create_user_response(
         col=response.col,
         selection_type=response.selection_type,
         user_session_id=response.user_session_id,
-        user_id=response.user_id
+        user_id=response.user_id,
+        gender=response.gender
     )
     
     db.add(db_response)
@@ -250,10 +291,12 @@ async def get_user_response(
 @app.get("/train-configurations/{config_id}/statistics", response_model=ResponseStatistics)
 async def get_response_statistics(
     config_id: int,
+    gender: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
     """
     Get aggregated statistics for responses to a specific train configuration.
+    Optionally filter by gender ('man', 'woman', 'neutral').
     """
     # Verify that the train configuration exists
     config_result = await db.execute(
@@ -267,10 +310,12 @@ async def get_response_statistics(
             detail=f"Train configuration with id {config_id} not found"
         )
     
-    # Get all responses for this configuration
-    result = await db.execute(
-        select(UserResponse).where(UserResponse.train_configuration_id == config_id)
-    )
+    # Get all responses for this configuration, optionally filtered by gender
+    query = select(UserResponse).where(UserResponse.train_configuration_id == config_id)
+    if gender:
+        query = query.where(UserResponse.gender == gender)
+    
+    result = await db.execute(query)
     responses = result.scalars().all()
     
     # Calculate statistics

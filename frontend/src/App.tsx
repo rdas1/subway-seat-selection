@@ -43,6 +43,7 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/scenario-editor" element={<ScenarioEditor />} />
           <Route path="/scenario/:id" element={<ScenarioPage />} />
+          <Route path="/scenario" element={<ScenarioPage />} />
         </Routes>
       </div>
     </BrowserRouter>

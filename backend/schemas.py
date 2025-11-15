@@ -5,9 +5,9 @@ from datetime import datetime
 
 # Tile schemas matching frontend types
 class TileSchema(BaseModel):
-    type: Literal["seat", "floor"] = Field(..., description="Type of tile: 'seat' or 'floor'")
+    type: Literal["seat", "floor", "barrier"] = Field(..., description="Type of tile: 'seat', 'floor', or 'barrier'")
     occupied: bool = Field(..., description="Whether the tile is occupied")
-    person: Optional[Literal["man", "woman", "child"]] = Field(None, description="Person type: 'man', 'woman', 'child', or null")
+    person: Optional[Literal["man", "woman", "child", "neutral"]] = Field(None, description="Person type: 'man', 'woman', 'child', 'neutral', or null")
     isDoor: Optional[bool] = Field(None, description="Whether this tile is a door")
     isStanchion: Optional[bool] = Field(None, description="Whether this tile has a stanchion")
 
@@ -41,6 +41,7 @@ class UserResponseCreate(BaseModel):
     selection_type: Literal["seat", "floor"] = Field(..., description="Type of selection: 'seat' or 'floor'")
     user_session_id: Optional[str] = Field(None, description="Optional session identifier")
     user_id: Optional[str] = Field(None, description="Optional user identifier")
+    gender: Optional[Literal["man", "woman", "neutral"]] = Field(None, description="User gender: 'man', 'woman', or 'neutral'")
 
 
 class UserResponseResponse(BaseModel):
@@ -51,6 +52,7 @@ class UserResponseResponse(BaseModel):
     selection_type: str
     user_session_id: Optional[str]
     user_id: Optional[str]
+    gender: Optional[str]
     created_at: datetime
 
     class Config:

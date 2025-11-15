@@ -27,6 +27,7 @@ export interface UserResponseCreate {
   selection_type: 'seat' | 'floor';
   user_session_id?: string;
   user_id?: string;
+  gender?: 'man' | 'woman' | 'neutral';
 }
 
 export interface UserResponseResponse {
@@ -82,8 +83,26 @@ export const trainConfigApi = {
     return response.json();
   },
 
-  async getStatistics(id: number) {
-    const response = await fetch(`${API_BASE_URL}/train-configurations/${id}/statistics`);
+  async getRandom(): Promise<TrainConfigurationResponse> {
+    const response = await fetch(`${API_BASE_URL}/train-configurations/random`);
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('No train configurations found');
+      }
+      throw new Error('Failed to fetch random train configuration');
+    }
+
+    return response.json();
+  },
+
+  async getStatistics(id: number, gender?: 'man' | 'woman' | 'neutral') {
+    const params = new URLSearchParams();
+    if (gender) {
+      params.append('gender', gender);
+    }
+    const url = `${API_BASE_URL}/train-configurations/${id}/statistics${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await fetch(url);
     
     if (!response.ok) {
       throw new Error('Failed to fetch statistics');
@@ -96,20 +115,41 @@ export const trainConfigApi = {
 // User Response API
 export const userResponseApi = {
   async create(response: UserResponseCreate): Promise<UserResponseResponse> {
-    const result = await fetch(`${API_BASE_URL}/user-responses`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(response),
-    });
+    const url = `${API_BASE_URL}/user-responses`;
+    console.log('Making POST request to:', url);
+    console.log('Request body:', JSON.stringify(response, null, 2));
+    
+    try {
+      const result = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(response),
+      });
 
-    if (!result.ok) {
-      const error = await result.json().catch(() => ({ detail: 'Failed to create user response' }));
-      throw new Error(error.detail || 'Failed to create user response');
+      console.log('Response status:', result.status, result.statusText);
+      console.log('Response headers:', Object.fromEntries(result.headers.entries()));
+
+      if (!result.ok) {
+        const errorText = await result.text();
+        console.error('Error response body:', errorText);
+        let error;
+        try {
+          error = JSON.parse(errorText);
+        } catch {
+          error = { detail: errorText || 'Failed to create user response' };
+        }
+        throw new Error(error.detail || `HTTP ${result.status}: ${result.statusText}`);
+      }
+
+      const responseData = await result.json();
+      console.log('Response data:', responseData);
+      return responseData;
+    } catch (err) {
+      console.error('Fetch error:', err);
+      throw err;
     }
-
-    return result.json();
   },
 
   async getAll(filters?: {
