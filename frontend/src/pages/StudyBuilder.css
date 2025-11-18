@@ -1,0 +1,95 @@
+.study-builder {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem;
+  min-height: calc(100vh - 60px);
+}
+
+.study-builder-container {
+  max-width: 600px;
+  width: 100%;
+  background-color: #2a2a2c;
+  border-radius: 8px;
+  padding: 2rem;
+}
+
+.study-builder-container h1 {
+  margin: 0 0 2rem 0;
+  color: white;
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.study-builder-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  color: #d7dadc;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.form-group input {
+  padding: 0.75rem;
+  border: 1px solid #565658;
+  border-radius: 4px;
+  background-color: #3a3a3c;
+  color: white;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #4a90e2;
+}
+
+.form-group input::placeholder {
+  color: #a0a0a0;
+}
+
+.submit-button {
+  padding: 0.75rem 1.5rem;
+  background-color: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.submit-button:hover {
+  background-color: #357abd;
+}
+
+.submit-button:active {
+  background-color: #2a5f8f;
+}
+
+@media (max-width: 768px) {
+  .study-builder {
+    padding: 1rem;
+  }
+
+  .study-builder-container {
+    padding: 1.5rem;
+  }
+
+  .study-builder-container h1 {
+    font-size: 1.5rem;
+  }
+}
+

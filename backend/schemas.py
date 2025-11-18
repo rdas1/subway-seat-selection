@@ -67,3 +67,41 @@ class ResponseStatistics(BaseModel):
     floor_selections: int
     selection_heatmap: Dict[str, int] = Field(..., description="Dictionary mapping 'row,col' to count of selections")
 
+
+# Scenario Group Schemas
+class ScenarioGroupItemCreate(BaseModel):
+    train_configuration_id: int = Field(..., description="ID of the train configuration to add")
+    order: int = Field(..., ge=0, description="Order position within the group (0-indexed)")
+
+
+class ScenarioGroupItemResponse(BaseModel):
+    id: int
+    scenario_group_id: int
+    train_configuration_id: int
+    order: int
+    created_at: datetime
+    train_configuration: Optional[TrainConfigurationResponse] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ScenarioGroupCreate(BaseModel):
+    email: str = Field(..., description="Email address for the scenario group")
+    items: Optional[List[ScenarioGroupItemCreate]] = Field(default=[], description="Optional list of scenarios to add initially")
+
+
+class ScenarioGroupUpdate(BaseModel):
+    email: Optional[str] = Field(None, description="Email address for the scenario group")
+
+
+class ScenarioGroupResponse(BaseModel):
+    id: int
+    email: str
+    created_at: datetime
+    updated_at: Optional[datetime]
+    items: List[ScenarioGroupItemResponse] = []
+
+    class Config:
+        from_attributes = True
+

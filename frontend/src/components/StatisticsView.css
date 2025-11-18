@@ -45,16 +45,32 @@
 
 .statistics-view .statistics-grid-wrapper {
   position: relative;
+  /* Match exact sizing constraints of regular grid-container */
   min-width: 20vw;
   max-width: 50vw;
+  margin: 0;
+  align-self: stretch;
+  /* No padding - grid-container handles its own padding */
+  padding: 0;
 }
 
 .statistics-view .statistics-grid-container {
   position: relative;
+  width: 100%;
+  height: 100%;
+  /* Ensure it doesn't add extra spacing */
+  margin: 0;
+  padding: 0;
 }
 
 .statistics-view .statistics-grid-container .grid-container {
   position: relative;
+  /* Ensure grid-container inside wrapper matches regular grid-container exactly */
+  /* Force it to match wrapper dimensions exactly */
+  min-width: 100% !important;
+  max-width: 100% !important;
+  width: 100%;
+  height: 100%;
 }
 
 .statistics-view .statistics-heatmap-overlays {
@@ -93,6 +109,8 @@
   padding: 20px;
   background-color: var(--grid-bg-container, #2a2a2c);
   border-radius: 8px;
+  /* Match platform-container positioning exactly */
+  border: none;
 }
 
 .statistics-view .statistics-summary {
@@ -102,8 +120,8 @@
 .statistics-view .agreement-message {
   margin-bottom: 20px;
   padding: 12px;
-  background-color: rgba(74, 144, 226, 0.2);
-  border-left: 3px solid #4a90e2;
+  background-color: rgba(0, 100, 0, 0.2); /* Green to match selection UI */
+  border-left: 3px solid #006400; /* Dark green to match selected tile color */
   border-radius: 4px;
   color: #d7dadc;
   font-size: 1em;
@@ -124,6 +142,50 @@
   color: #d7dadc;
 }
 
+/* Heatmap Legend Styles */
+.statistics-view .heatmap-legend {
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.statistics-view .heatmap-legend h4 {
+  margin: 0 0 12px 0;
+  color: white;
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.statistics-view .heatmap-gradient-bar {
+  width: 100%;
+  height: 24px;
+  background-color: #000;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.statistics-view .heatmap-gradient-fill {
+  width: 100%;
+  height: 100%;
+}
+
+.statistics-view .heatmap-legend-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85em;
+  color: #d7dadc;
+  margin-bottom: 8px;
+}
+
+.statistics-view .heatmap-legend-note {
+  font-size: 0.8em;
+  color: #a0a0a0;
+  font-style: italic;
+  margin: 0;
+}
+
 .statistics-view .heatmap-overlay {
   position: absolute;
   top: 0;
@@ -132,7 +194,7 @@
   bottom: 0;
   width: 100%;
   height: 100%;
-  opacity: 0.75;
+  opacity: 0.9;
   z-index: 101;
   pointer-events: auto;
   border-radius: 2px;
@@ -162,6 +224,8 @@
 .statistics-view .heatmap-overlay.heatmap-unchosen {
   background-color: #000 !important;
   opacity: 0.7;
+  border: 2px solid #3b82f6; /* Blue outline for 0-selected tiles (seats and floor) */
+  box-sizing: border-box;
 }
 
 .statistics-view .heatmap-overlay.heatmap-unchosen-seat {
@@ -185,12 +249,26 @@
 }
 
 .statistics-view .heatmap-overlay.user-selection-highlight {
-  outline: 3px solid #4a90e2;
+  outline: 3px solid #006400; /* Dark green to match selected tile color */
   outline-offset: -3px;
-  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.5);
+  box-shadow: 0 0 0 2px rgba(0, 100, 0, 0.5);
   z-index: 103;
   /* Keep position: absolute from parent */
   border-radius: 2px;
+  animation: user-selection-pulse 2s ease-in-out infinite;
+}
+
+@keyframes user-selection-pulse {
+  0%, 100% {
+    outline-width: 3px;
+    outline-color: #006400;
+    box-shadow: 0 0 0 2px rgba(0, 100, 0, 0.5);
+  }
+  50% {
+    outline-width: 4px;
+    outline-color: #00cc00; /* Lighter green for pulse effect */
+    box-shadow: 0 0 0 4px rgba(0, 200, 0, 0.7);
+  }
 }
 
 /* Legacy styles for text-based heatmap (keeping for backwards compatibility) */
@@ -253,6 +331,15 @@
   padding-bottom: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   font-size: 0.9em;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.statistics-tooltip .tooltip-percentage {
+  font-weight: bold;
+  color: #4a90e2;
+  font-size: 1.1em;
 }
 
 .statistics-tooltip .tooltip-breakdown {

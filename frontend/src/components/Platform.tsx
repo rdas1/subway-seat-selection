@@ -11,9 +11,10 @@ interface PlatformProps {
   playerGender: PlayerGender;
   doorsOpen: boolean;
   animationState?: 'idle' | 'slidingIn' | 'slidingOut';
+  hideUserIndicator?: boolean;
 }
 
-export default function Platform({ grid, onTileClick, selectedTile, playerGender, doorsOpen, animationState = 'idle' }: PlatformProps) {
+export default function Platform({ grid, onTileClick, selectedTile, playerGender, doorsOpen, animationState = 'idle', hideUserIndicator = false }: PlatformProps) {
   const isSelected = (row: number, col: number): boolean => {
     return selectedTile !== null && 
            selectedTile !== undefined && 
@@ -42,8 +43,8 @@ export default function Platform({ grid, onTileClick, selectedTile, playerGender
             tile={tile}
             onClick={() => onTileClick(rowIndex, colIndex)}
             isEligible={grid.isEligibleSeat(rowIndex, colIndex)}
-            isSelected={isSelected(rowIndex, colIndex)}
-            playerEmoji={isSelected(rowIndex, colIndex) ? getPlayerEmoji(playerGender) : undefined}
+            isSelected={!hideUserIndicator && isSelected(rowIndex, colIndex)}
+            playerEmoji={!hideUserIndicator && isSelected(rowIndex, colIndex) ? getPlayerEmoji(playerGender) : undefined}
             colIndex={colIndex}
             gridWidth={grid.width}
             doorsOpen={doorsOpen}

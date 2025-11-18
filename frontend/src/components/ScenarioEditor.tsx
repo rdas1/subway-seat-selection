@@ -12,7 +12,7 @@ interface ScenarioEditorProps {
 export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
   const [grid, setGrid] = useState<SubwayGrid | null>(initialGrid || null);
   const [name, setName] = useState<string>('');
-  const [selectedMode, setSelectedMode] = useState<'seat' | 'floor' | 'stanchion' | 'barrier' | 'man' | 'woman' | 'neutral' | 'eraser'>('seat');
+  const [selectedMode, setSelectedMode] = useState<'seat' | 'floor' | 'stanchion' | 'barrier' | 'man' | 'woman' | 'neutral' | 'eraser'>('neutral');
   const [capacity, setCapacity] = useState<number>(50);
   const [menPercentage, setMenPercentage] = useState<number>(50);
   const [womenPercentage, setWomenPercentage] = useState<number>(50);
@@ -20,6 +20,7 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
   const [saving, setSaving] = useState(false);
   const [savedConfig, setSavedConfig] = useState<TrainConfigurationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [gridHeight, setGridHeight] = useState<number>(20);
   const [gridWidth, setGridWidth] = useState<number>(5);
 
@@ -32,21 +33,21 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
       for (let row = 0; row < height; row++) {
         const rowTiles: Tile[] = [];
         
-        // Column 0: First bench column (seats in rows 0-2, 5-14, 17-19; floor in rows 3-4, 15-16)
-        if (row >= 0 && row <= 2) {
-          // First 3-seat bench
+        // Column 0: First bench column (seats in rows 0-1, 5-14, 18-19; floor in rows 2-4, 15-17)
+        if (row >= 0 && row <= 1) {
+          // First 2-seat bench
           rowTiles.push({ type: 'seat', occupied: false });
-        } else if (row >= 3 && row <= 4) {
-          // Door gap - left side (rows 3-4, column 0)
+        } else if (row >= 2 && row <= 4) {
+          // Door gap - left side (rows 2-4, column 0) - 3 tiles
           rowTiles.push({ type: 'floor', occupied: false, isDoor: true });
         } else if (row >= 5 && row <= 14) {
           // 10-seat bench
           rowTiles.push({ type: 'seat', occupied: false });
-        } else if (row >= 15 && row <= 16) {
-          // Door gap - left side (rows 15-16, column 0)
+        } else if (row >= 15 && row <= 17) {
+          // Door gap - left side (rows 15-17, column 0) - 3 tiles
           rowTiles.push({ type: 'floor', occupied: false, isDoor: true });
-        } else if (row >= 17 && row <= 19) {
-          // Last 3-seat bench
+        } else if (row >= 18 && row <= 19) {
+          // Last 2-seat bench
           rowTiles.push({ type: 'seat', occupied: false });
         }
         
@@ -63,21 +64,21 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
         
         rowTiles.push({ type: 'floor', occupied: false });
         
-        // Column 4: Last bench column (seats in rows 0-2, 5-14, 17-19; floor in rows 3-4, 15-16)
-        if (row >= 0 && row <= 2) {
-          // First 3-seat bench
+        // Column 4: Last bench column (seats in rows 0-1, 5-14, 18-19; floor in rows 2-4, 15-17)
+        if (row >= 0 && row <= 1) {
+          // First 2-seat bench
           rowTiles.push({ type: 'seat', occupied: false });
-        } else if (row >= 3 && row <= 4) {
-          // Door gap - right side (rows 3-4, column 4)
+        } else if (row >= 2 && row <= 4) {
+          // Door gap - right side (rows 2-4, column 4) - 3 tiles
           rowTiles.push({ type: 'floor', occupied: false, isDoor: true });
         } else if (row >= 5 && row <= 14) {
           // 10-seat bench
           rowTiles.push({ type: 'seat', occupied: false });
-        } else if (row >= 15 && row <= 16) {
-          // Door gap - right side (rows 15-16, column 4)
+        } else if (row >= 15 && row <= 17) {
+          // Door gap - right side (rows 15-17, column 4) - 3 tiles
           rowTiles.push({ type: 'floor', occupied: false, isDoor: true });
-        } else if (row >= 17 && row <= 19) {
-          // Last 3-seat bench
+        } else if (row >= 18 && row <= 19) {
+          // Last 2-seat bench
           rowTiles.push({ type: 'seat', occupied: false });
         }
         
@@ -544,7 +545,6 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
       });
 
       setSavedConfig(config);
-      alert(`Scenario saved successfully! ID: ${config.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save scenario');
     } finally {
@@ -566,105 +566,95 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
 
   return (
     <div className="scenario-editor">
-      <div className="scenario-editor-header">
+      {/* <div className="scenario-editor-header">
         <h1>Scenario Editor</h1>
         <p>Create and share subway train configurations</p>
-      </div>
-
-      {/* <div className="scenario-editor-controls">
-        <div className="control-group">
-          <label>Grid Size:</label>
-          <div className="grid-size-inputs">
-            <input
-              type="number"
-              min="1"
-              max="50"
-              placeholder="Height"
-              value={gridHeight}
-              onChange={(e) => {
-                const height = parseInt(e.target.value) || 20;
-                setGridHeight(height);
-              }}
-              onBlur={(e) => {
-                const height = parseInt(e.target.value) || 20;
-                setGridHeight(height);
-                const width = gridWidth;
-                if (!grid || height !== grid.height || width !== grid.width) {
-                  initializeGrid(height, width);
-                }
-              }}
-            />
-            <span>×</span>
-            <input
-              type="number"
-              min="1"
-              max="50"
-              placeholder="Width"
-              value={gridWidth}
-              onChange={(e) => {
-                const width = parseInt(e.target.value) || 5;
-                setGridWidth(width);
-              }}
-              onBlur={(e) => {
-                const height = gridHeight;
-                const width = parseInt(e.target.value) || 5;
-                setGridWidth(width);
-                if (!grid || height !== grid.height || width !== grid.width) {
-                  initializeGrid(height, width);
-                }
-              }}
-            />
-            <button
-              className="create-grid-button"
-              onClick={() => initializeGrid(gridHeight, gridWidth)}
-            >
-              Create Grid
-            </button>
-          </div>
-        </div>
-
-        <div className="control-group">
-          <label>Scenario Name:</label>
-          <input
-            type="text"
-            placeholder="Enter scenario name (optional)"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
-
-
-        <div className="control-group">
-          <button
-            className="save-button"
-            onClick={handleSave}
-            disabled={!grid || saving}
-          >
-            {saving ? 'Saving...' : 'Save Scenario'}
-          </button>
-        </div>
-
-        {savedConfig && (
-          <div className="saved-info">
-            <p>Saved! Configuration ID: {savedConfig.id}</p>
-            <p className="saved-time">
-              Created: {new Date(savedConfig.created_at).toLocaleString()}
-            </p>
-          </div>
-        )}
-
-        {error && (
-          <div className="error-message">
-            {error}
-          </div>
-        )}
       </div> */}
 
+
+
       {grid ? (
-        <div className="scenario-editor-grid-wrapper">
+        <div className={`scenario-editor-grid-wrapper ${savedConfig ? 'has-banner' : ''}`}>
+          {savedConfig && (
+            <div className="save-success-banner">
+              <div className="save-success-content">
+                <span className="save-success-message">
+                  ✓ Scenario {savedConfig.id} saved! 
+                  <a 
+                    href={`/scenario/${savedConfig.id}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="scenario-link"
+                  >
+                    View scenario
+                  </a>
+                </span>
+                <button
+                  className="copy-link-button"
+                  onClick={() => {
+                    const url = `${window.location.origin}/scenario/${savedConfig.id}`;
+                    navigator.clipboard.writeText(url).then(() => {
+                      setLinkCopied(true);
+                      setTimeout(() => {
+                        setLinkCopied(false);
+                      }, 2000);
+                    }).catch(() => {
+                      // Fallback for older browsers
+                      const textArea = document.createElement('textarea');
+                      textArea.value = url;
+                      document.body.appendChild(textArea);
+                      textArea.select();
+                      document.execCommand('copy');
+                      document.body.removeChild(textArea);
+                      setLinkCopied(true);
+                      setTimeout(() => {
+                        setLinkCopied(false);
+                      }, 2000);
+                    });
+                  }}
+                >
+                  {linkCopied ? 'Copied!' : 'Copy Link'}
+                </button>
+                <button
+                  className="close-banner-button"
+                  onClick={() => setSavedConfig(null)}
+                  aria-label="Close banner"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
           <div className="tile-selector-header">
             <div className="tile-selector-label">Add:</div>
             <div className="tile-selector-tiles">
+              <div
+                className={`tile-selector-item ${selectedMode === 'man' ? 'active' : ''}`}
+                onClick={() => setSelectedMode('man')}
+              >
+                <div className="tile-selector-preview person-preview">
+                  <span className="person-emoji-preview">👨</span>
+                </div>
+                <span>Man</span>
+              </div>
+              <div
+                className={`tile-selector-item ${selectedMode === 'woman' ? 'active' : ''}`}
+                onClick={() => setSelectedMode('woman')}
+              >
+                <div className="tile-selector-preview person-preview">
+                  <span className="person-emoji-preview">👩</span>
+                </div>
+                <span>Woman</span>
+              </div>
+              <div
+                className={`tile-selector-item ${selectedMode === 'neutral' ? 'active' : ''}`}
+                onClick={() => setSelectedMode('neutral')}
+              >
+                <div className="tile-selector-preview person-preview">
+                  <span className="person-emoji-preview">🧑</span>
+                </div>
+                <span>Person</span>
+              </div>
               <div
                 className={`tile-selector-item ${selectedMode === 'seat' ? 'active' : ''}`}
                 onClick={() => setSelectedMode('seat')}
@@ -694,38 +684,11 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
                 <span>Barrier</span>
               </div>
               <div
-                className={`tile-selector-item ${selectedMode === 'man' ? 'active' : ''}`}
-                onClick={() => setSelectedMode('man')}
-              >
-                <div className="tile-selector-preview person-preview">
-                  <span className="person-emoji-preview">👨</span>
-                </div>
-                <span>Man</span>
-              </div>
-              <div
-                className={`tile-selector-item ${selectedMode === 'woman' ? 'active' : ''}`}
-                onClick={() => setSelectedMode('woman')}
-              >
-                <div className="tile-selector-preview person-preview">
-                  <span className="person-emoji-preview">👩</span>
-                </div>
-                <span>Woman</span>
-              </div>
-              <div
-                className={`tile-selector-item ${selectedMode === 'neutral' ? 'active' : ''}`}
-                onClick={() => setSelectedMode('neutral')}
-              >
-                <div className="tile-selector-preview person-preview">
-                  <span className="person-emoji-preview">🧑</span>
-                </div>
-                <span>Person</span>
-              </div>
-              <div
                 className={`tile-selector-item ${selectedMode === 'eraser' ? 'active' : ''}`}
                 onClick={() => setSelectedMode('eraser')}
               >
                 <div className="tile-selector-preview eraser-preview">
-                  <span className="eraser-icon">🧹</span>
+                  <span className="eraser-icon">❌</span>
                 </div>
                 <span>Eraser</span>
               </div>

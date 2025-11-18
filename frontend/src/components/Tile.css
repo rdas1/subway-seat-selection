@@ -132,6 +132,7 @@
   /* Outer edge: right border for door tiles in last column */
   border-right: 4px solid var(--door-border);
   transition: border-right 0.3s ease;
+  z-index: 100;
 }
 
 .tile-stanchion {
@@ -195,5 +196,8 @@
   background-color: var(--grid-bg-floor) !important;
   border: 3px solid var(--platform-caution) !important;
   /* Gray background with yellow outline for selected occupied platform caution tiles */
+}
+.tile-selected.tile-platform-caution.tile-selected:hover {
+  background-color: var(--selected-bg) !important;
 }
 

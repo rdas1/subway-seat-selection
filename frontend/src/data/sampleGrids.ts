@@ -2,7 +2,7 @@ import { SubwayGrid } from '../classes/SubwayGrid';
 import { Tile } from '../types/grid';
 
 // Sample grid: 20 rows x 5 columns
-// Columns 0 and 4: benches (vertical - 3 seats, gap 2, 10 seats, gap 2, 3 seats)
+// Columns 0 and 4: benches (vertical - 2 seats, gap 3, 10 seats, gap 3, 2 seats)
 // Columns 1, 2, and 3: aisle (all floor tiles)
 export const createSampleGrid1 = (percentFilled: number = 0.6): SubwayGrid => {
   const tiles: Tile[][] = [];
@@ -11,15 +11,15 @@ export const createSampleGrid1 = (percentFilled: number = 0.6): SubwayGrid => {
   for (let row = 0; row < 20; row++) {
     const rowTiles: Tile[] = [];
     
-    // Column 0: First bench column (seats in rows 0-2, 5-14, 17-19; floor in rows 3-4, 15-16)
-    if (row >= 0 && row <= 2) {
-      // First 3-seat bench
+    // Column 0: First bench column (seats in rows 0-1, 5-14, 18-19; floor in rows 2-4, 15-17)
+    if (row >= 0 && row <= 1) {
+      // First 2-seat bench
       rowTiles.push({ 
         type: 'seat', 
         occupied: false // Will be populated randomly later
       });
-    } else if (row >= 3 && row <= 4) {
-      // Door gap - left side (rows 3-4, column 0)
+    } else if (row >= 2 && row <= 4) {
+      // Door gap - left side (rows 2-4, column 0) - 3 tiles
       rowTiles.push({ type: 'floor', occupied: false, isDoor: true });
     } else if (row >= 5 && row <= 14) {
       // 10-seat bench
@@ -27,11 +27,11 @@ export const createSampleGrid1 = (percentFilled: number = 0.6): SubwayGrid => {
         type: 'seat', 
         occupied: false // Will be populated randomly later
       });
-    } else if (row >= 15 && row <= 16) {
-      // Door gap - left side (rows 15-16, column 0)
+    } else if (row >= 15 && row <= 17) {
+      // Door gap - left side (rows 15-17, column 0) - 3 tiles
       rowTiles.push({ type: 'floor', occupied: false, isDoor: true });
-    } else if (row >= 17 && row <= 19) {
-      // Last 3-seat bench
+    } else if (row >= 18 && row <= 19) {
+      // Last 2-seat bench
       rowTiles.push({ 
         type: 'seat', 
         occupied: false // Will be populated randomly later
@@ -51,15 +51,15 @@ export const createSampleGrid1 = (percentFilled: number = 0.6): SubwayGrid => {
     
     rowTiles.push({ type: 'floor', occupied: false });
     
-    // Column 4: Last bench column (seats in rows 0-2, 5-14, 17-19; floor in rows 3-4, 15-16)
-    if (row >= 0 && row <= 2) {
-      // First 3-seat bench
+    // Column 4: Last bench column (seats in rows 0-1, 5-14, 18-19; floor in rows 2-4, 15-17)
+    if (row >= 0 && row <= 1) {
+      // First 2-seat bench
       rowTiles.push({ 
         type: 'seat', 
         occupied: false // Will be populated randomly later
       });
-    } else if (row >= 3 && row <= 4) {
-      // Door gap - right side (rows 3-4, column 4)
+    } else if (row >= 2 && row <= 4) {
+      // Door gap - right side (rows 2-4, column 4) - 3 tiles
       rowTiles.push({ type: 'floor', occupied: false, isDoor: true });
     } else if (row >= 5 && row <= 14) {
       // 10-seat bench
@@ -67,11 +67,11 @@ export const createSampleGrid1 = (percentFilled: number = 0.6): SubwayGrid => {
         type: 'seat', 
         occupied: false // Will be populated randomly later
       });
-    } else if (row >= 15 && row <= 16) {
-      // Door gap - right side (rows 15-16, column 4)
+    } else if (row >= 15 && row <= 17) {
+      // Door gap - right side (rows 15-17, column 4) - 3 tiles
       rowTiles.push({ type: 'floor', occupied: false, isDoor: true });
-    } else if (row >= 17 && row <= 19) {
-      // Last 3-seat bench
+    } else if (row >= 18 && row <= 19) {
+      // Last 2-seat bench
       rowTiles.push({ 
         type: 'seat', 
         occupied: false // Will be populated randomly later

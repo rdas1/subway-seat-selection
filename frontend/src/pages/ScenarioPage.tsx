@@ -4,9 +4,9 @@ import SeatSelectionApp from '../components/SeatSelectionApp'
 import StatisticsView from '../components/StatisticsView'
 import Legend from '../components/Legend'
 import { SubwayGrid } from '../classes/SubwayGrid'
-import { getRandomTrainDelay } from '../constants/train'
 import { PlayerGender } from '../App'
 import { trainConfigApi, userResponseApi } from '../services/api'
+import { getSessionId } from '../utils/session'
 
 export default function ScenarioPage() {
   const { id } = useParams<{ id: string }>()
@@ -25,7 +25,6 @@ export default function ScenarioPage() {
   const [scenarioId, setScenarioId] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState<boolean>(false)
   const [submitSuccess, setSubmitSuccess] = useState<boolean>(false)
-  const [countdown, setCountdown] = useState<number | null>(null)
   const [trainArrived, setTrainArrived] = useState<boolean>(false)
   const [isTrainActive, setIsTrainActive] = useState<boolean>(false)
   const [statistics, setStatistics] = useState<{
@@ -35,6 +34,7 @@ export default function ScenarioPage() {
     selection_heatmap: Record<string, number>
   } | null>(null)
   const [userSelection, setUserSelection] = useState<{ row: number; col: number } | null>(null)
+  const [hasPreviousResponse, setHasPreviousResponse] = useState<boolean>(false)
 
   // Check URL for results parameter
   const showResults = searchParams.get('results') === 'true'
@@ -56,67 +56,61 @@ export default function ScenarioPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showResults, scenarioId])
 
-  // Initialize countdown on mount (only if no ID and not in results mode)
+  // Load random scenario on mount (only if no ID and not in results mode)
   useEffect(() => {
-    if (!id && !showResults) {
-      const delay = getRandomTrainDelay()
-      setCountdown(delay)
-      setTrainArrived(false)
-      setIsTrainActive(true)
-    }
-  }, [id, showResults])
-
-  // Countdown timer
-  useEffect(() => {
-    // Don't run countdown when in results mode or when ID is provided
-    if (showResults || id) {
-      return
-    }
-
-    if (countdown === null || countdown <= 0) {
-      if (countdown === 0 && isTrainActive && !grid) {
-        // Train has arrived and train is active - load a random scenario
-        const loadRandomScenario = async () => {
+    if (!id && !showResults && !grid) {
+      // Load a random scenario immediately
+      const loadRandomScenario = async () => {
+        try {
+          setLoading(true)
+          console.log('Loading random scenario...')
+          const config = await trainConfigApi.getRandom()
+          
+          // Clear any existing selection state first
+          setSelectedTile(null)
+          setSelectionType(null)
+          
+          const subwayGrid = new SubwayGrid(config.height, config.width, config.tiles)
+          setGrid(subwayGrid)
+          setScenarioId(config.id)
+          setScenarioName(config.name || null)
+          console.log('Random scenario loaded with ID:', config.id, 'Name:', config.name)
+          
+          // Check if user has already responded to this scenario (for hiding platform user indicator)
           try {
-            console.log('Loading random scenario for train arrival...')
-            const config = await trainConfigApi.getRandom()
-            const subwayGrid = new SubwayGrid(config.height, config.width, config.tiles)
-            setGrid(subwayGrid)
-            setScenarioId(config.id)
-            setScenarioName(config.name || null)
-            console.log('Random scenario loaded with ID:', config.id, 'Name:', config.name)
-            
-            // Update URL to include scenario ID
-            navigate(`/scenario/${config.id}`, { replace: true })
-            
-            setTrainArrived(true)
-            setGridAnimation('slidingIn')
-            setTimeout(() => {
-              setGridAnimation('idle')
-            }, 600)
-            setLoading(false)
+            const sessionId = getSessionId()
+            const previousResponse = await userResponseApi.getPreviousResponse(config.id, sessionId)
+            setHasPreviousResponse(!!previousResponse && previousResponse.train_configuration_id === config.id)
           } catch (err) {
-            console.error('Failed to load random scenario:', err)
-            setError(err instanceof Error ? err.message : 'Failed to load scenario')
-            setLoading(false)
+            console.error('Failed to check previous response:', err)
+            setHasPreviousResponse(false)
+            // Don't block scenario loading if this fails
           }
+          
+          // Update URL to include scenario ID
+          navigate(`/scenario/${config.id}`, { replace: true })
+          
+          setTrainArrived(true)
+          setIsTrainActive(true)
+          setGridAnimation('slidingIn')
+          setTimeout(() => {
+            setGridAnimation('idle')
+          }, 600)
+          setLoading(false)
+        } catch (err) {
+          console.error('Failed to load random scenario:', err)
+          setError(err instanceof Error ? err.message : 'Failed to load scenario')
+          setLoading(false)
         }
-        loadRandomScenario()
       }
-      return
+      loadRandomScenario()
     }
-
-    const timer = setTimeout(() => {
-      setCountdown(countdown - 1)
-    }, 1000)
-
-    return () => clearTimeout(timer)
-  }, [countdown, grid, isTrainActive, showResults, id, navigate])
+  }, [id, showResults, grid, navigate])
 
   // Load scenario on mount (when ID is provided)
   useEffect(() => {
     if (!id) {
-      // If no ID, we'll load via countdown
+      // If no ID, we'll load via the random scenario effect
       return
     }
 
@@ -135,12 +129,27 @@ export default function ScenarioPage() {
 
         const config = await trainConfigApi.getById(scenarioId)
         
+        // Clear any existing selection state first
+        setSelectedTile(null)
+        setSelectionType(null)
+        
         // Create SubwayGrid from the configuration
         const subwayGrid = new SubwayGrid(config.height, config.width, config.tiles)
         setGrid(subwayGrid)
         setScenarioName(config.name || null)
         setScenarioId(scenarioId)
         console.log('Scenario ID set for responses:', scenarioId)
+        
+        // Check if user has already responded to this scenario (for hiding platform user indicator)
+        try {
+          const sessionId = getSessionId()
+          const previousResponse = await userResponseApi.getPreviousResponse(scenarioId, sessionId)
+          setHasPreviousResponse(!!previousResponse && previousResponse.train_configuration_id === scenarioId)
+        } catch (err) {
+          console.error('Failed to check previous response:', err)
+          setHasPreviousResponse(false)
+          // Don't block scenario loading if this fails
+        }
         
         // Trigger slide-in animation
         setGridAnimation('slidingIn')
@@ -197,13 +206,15 @@ export default function ScenarioPage() {
             selection_type: responseSelectionType,
           })
           
-          // Submit the user response
+          // Submit the user response with session ID
+          const sessionId = getSessionId()
           const response = await userResponseApi.create({
             train_configuration_id: scenarioId,
             row: selectedTile.row,
             col: selectedTile.col,
             selection_type: responseSelectionType,
             gender: playerGender,
+            user_session_id: sessionId,
           })
           
           console.log('POST request successful:', response)
@@ -211,6 +222,7 @@ export default function ScenarioPage() {
           
           // Store user's selection before navigating to results
           setUserSelection({ row: selectedTile.row, col: selectedTile.col })
+          setHasPreviousResponse(true)
           
           // Fetch statistics and navigate to results
           try {
@@ -258,7 +270,7 @@ export default function ScenarioPage() {
     if (grid) {
       setIsTrainActive(false) // Mark train as inactive immediately
       setGridAnimation('slidingOut')
-      // After animation completes, navigate to /scenario (no ID) to trigger countdown
+      // After animation completes, navigate to /scenario (no ID) to trigger random scenario load
       setTimeout(() => {
         setGrid(null)
         setSelectedTile(null)
@@ -270,21 +282,17 @@ export default function ScenarioPage() {
         setSubmitSuccess(false)
         setStatistics(null)
         setUserSelection(null)
-        // Navigate to /scenario without ID to trigger countdown and random scenario
+        setHasPreviousResponse(false)
+        // Navigate to /scenario without ID to trigger random scenario load
         navigate('/scenario', { replace: true })
         // Recreate platform when train leaves
         setPlatformRecreateTrigger(prev => prev + 1)
-        // Generate random delay for next train
-        const delay = getRandomTrainDelay()
-        setCountdown(delay)
-        // Mark train as active again so countdown can trigger arrival
-        setIsTrainActive(true)
+        // Mark train as inactive - will be set to active when new scenario loads
+        setIsTrainActive(false)
       }, 600) // Match animation duration
     } else {
-      // If train hasn't arrived yet, just reset countdown
-      setIsTrainActive(true) // Mark train as active
-      const delay = getRandomTrainDelay()
-      setCountdown(delay)
+      // If train hasn't arrived yet, clear state and navigate
+      setIsTrainActive(false)
       setTrainArrived(false)
       setGrid(null)
       setSelectedTile(null)
@@ -292,7 +300,8 @@ export default function ScenarioPage() {
       setScenarioName(null)
       setStatistics(null)
       setUserSelection(null)
-      // Navigate to /scenario without ID to trigger countdown
+      setHasPreviousResponse(false)
+      // Navigate to /scenario without ID to trigger random scenario load
       navigate('/scenario', { replace: true })
     }
     console.log('Waiting for next train')
@@ -308,37 +317,33 @@ export default function ScenarioPage() {
     // Store grid state before clearing
     const hadGrid = !!grid
     
-    // Clear grid immediately to show countdown/platform right away
+    // Clear grid immediately to show loading/platform right away
     setGrid(null)
     setTrainArrived(false)
     setScenarioId(null)
     setScenarioName(null)
     setUserSelection(null)
+    setHasPreviousResponse(false)
     
     // Start slide-out animation if grid was visible
     if (hadGrid) {
       setIsTrainActive(false)
       setGridAnimation('slidingOut')
-      // After animation completes, navigate to /scenario (no ID) to trigger countdown
+      // After animation completes, navigate to /scenario (no ID) to trigger random scenario load
       setTimeout(() => {
         setGridAnimation('idle')
-        // Navigate to /scenario without ID to trigger countdown and random scenario
+        // Navigate to /scenario without ID to trigger random scenario load
         navigate('/scenario', { replace: true })
         // Recreate platform when train leaves
         setPlatformRecreateTrigger(prev => prev + 1)
-        // Generate random delay for next train
-        const delay = getRandomTrainDelay()
-        setCountdown(delay)
-        // Mark train as active again so countdown can trigger arrival
-        setIsTrainActive(true)
+        // Mark train as inactive - will be set to active when new scenario loads
+        setIsTrainActive(false)
       }, 600) // Match animation duration
     } else {
-      // If no grid, immediately navigate and start countdown
+      // If no grid, immediately navigate to trigger random scenario load
       navigate('/scenario', { replace: true })
       setPlatformRecreateTrigger(prev => prev + 1)
-      const delay = getRandomTrainDelay()
-      setCountdown(delay)
-      setIsTrainActive(true)
+      setIsTrainActive(false)
     }
   }
 
@@ -352,15 +357,6 @@ export default function ScenarioPage() {
     if (submitSuccess) {
       setSubmitSuccess(false)
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="App">
-        <div className="loading-message">
-        </div>
-      </div>
-    )
   }
 
   if (error) {
@@ -386,17 +382,13 @@ export default function ScenarioPage() {
           ) : grid ? (
             <>
               {scenarioName && <h1>{scenarioName}</h1>}
-              <h1 className="main-header-prompt">Where would you sit (or stand)?</h1>
+              <h1 className="main-header-prompt">Your train is here! Where will you sit (or stand)?</h1>
             </>
-          ) : countdown && countdown > 0 ? (
+          ) : loading || !grid ? (
             <>
-              <h1>Your train is arriving in {countdown ?? '...'} {countdown === 1 ? 'second' : 'seconds'}</h1>
+              <h1>Loading...</h1>
             </>
-          ) : (
-            <>
-              <h1>Your train is on its way!</h1>
-            </>
-          )}
+          ) : null}
         </div>
         {!showResults && (
           <Legend 
@@ -425,6 +417,7 @@ export default function ScenarioPage() {
             platformRecreateTrigger={platformRecreateTrigger}
             animationState={gridAnimation}
             showTrain={(trainArrived || !!id) && isTrainActive && !showResults && !!grid}
+            hasPreviousResponse={hasPreviousResponse}
           />
         )}
       </main>
@@ -463,15 +456,7 @@ export default function ScenarioPage() {
               {submitting ? 'Submitting...' : 'Continue'}
             </button>
           </>
-        ) : (
-          <button 
-            className="continue-button" 
-            onClick={handleContinue}
-            disabled={submitting}
-          >
-            Wait for the next train
-          </button>
-        )}
+        ) : null}
       </footer>
     </div>
   )

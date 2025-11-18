@@ -14,9 +14,10 @@ interface SeatSelectionAppProps {
   platformRecreateTrigger?: number;
   animationState?: 'idle' | 'slidingIn' | 'slidingOut';
   showTrain?: boolean;
+  hasPreviousResponse?: boolean;
 }
 
-export default function SeatSelectionApp({ initialGrid, playerGender, onSelectionChange, onSelectionTypeChange, clearSelectionTrigger, platformRecreateTrigger, animationState = 'idle', showTrain = true }: SeatSelectionAppProps) {
+export default function SeatSelectionApp({ initialGrid, playerGender, onSelectionChange, onSelectionTypeChange, clearSelectionTrigger, platformRecreateTrigger, animationState = 'idle', showTrain = true, hasPreviousResponse = false }: SeatSelectionAppProps) {
   const [grid, setGrid] = useState<SubwayGrid | null>(initialGrid);
   const [platformGrid, setPlatformGrid] = useState<SubwayGrid>(() => {
     const height = initialGrid?.height ?? 20; // Default height if no grid
@@ -99,7 +100,8 @@ export default function SeatSelectionApp({ initialGrid, playerGender, onSelectio
   // Update grid when initialGrid prop changes (when train arrives)
   useEffect(() => {
     setGrid(initialGrid);
-    setSelectedTile(null); // Clear train selection when grid changes
+    // Always clear train selection when grid changes - no pre-selection
+    setSelectedTile(null);
     // Don't recreate platform here - only when train leaves
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialGrid]);
@@ -107,7 +109,7 @@ export default function SeatSelectionApp({ initialGrid, playerGender, onSelectio
   // Clear selection when clearSelectionTrigger changes
   useEffect(() => {
     if (clearSelectionTrigger && clearSelectionTrigger > 0) {
-      setSelectedTile(null);
+    setSelectedTile(null);
       // Restore platform selection when clearing
       if (lastPlatformPosition) {
         setSelectedPlatformTile(lastPlatformPosition);
@@ -236,18 +238,10 @@ export default function SeatSelectionApp({ initialGrid, playerGender, onSelectio
           playerGender={playerGender}
           doorsOpen={doorsOpen}
           animationState="idle"
+          hideUserIndicator={false}
         />
       </div>
-      {(selectedTile || selectedPlatformTile) && (
-        <div className="selection-info">
-          {selectedTile && (
-            <p>Selected seat: Row {selectedTile.row + 1}, Column {selectedTile.col + 1}</p>
-          )}
-          {selectedPlatformTile && (
-            <p>Selected platform position: Row {selectedPlatformTile.row + 1}, Column {selectedPlatformTile.col + 1}</p>
-          )}
-        </div>
-      )}
+
     </div>
   );
 }

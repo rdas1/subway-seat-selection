@@ -3,6 +3,7 @@ import './App.css'
 import HomePage from './pages/HomePage'
 import ScenarioEditor from './components/ScenarioEditor'
 import ScenarioPage from './pages/ScenarioPage'
+import StudyBuilder from './pages/StudyBuilder'
 
 export type PlayerGender = 'man' | 'woman' | 'neutral'
 
@@ -28,6 +29,12 @@ function Navigation() {
           >
             Scenario Editor
           </Link>
+          <Link 
+            to="/study-builder" 
+            className={location.pathname === '/study-builder' ? 'active' : ''}
+          >
+            Study Builder
+          </Link>
         </div>
       </div>
     </nav>
@@ -42,6 +49,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/scenario-editor" element={<ScenarioEditor />} />
+          <Route path="/study-builder" element={<StudyBuilder />} />
           <Route path="/scenario/:id" element={<ScenarioPage />} />
           <Route path="/scenario" element={<ScenarioPage />} />
         </Routes>

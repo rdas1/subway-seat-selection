@@ -2,18 +2,24 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text, select, func
+from sqlalchemy.orm import selectinload
 from contextlib import asynccontextmanager
 from typing import List, Optional
 import os
 import random
 from database import init_db, close_db, get_db
-from models import Base, TrainConfiguration, UserResponse
+from models import Base, TrainConfiguration, UserResponse, ScenarioGroup, ScenarioGroupItem
 from schemas import (
     TrainConfigurationCreate,
     TrainConfigurationResponse,
     UserResponseCreate,
     UserResponseResponse,
-    ResponseStatistics
+    ResponseStatistics,
+    ScenarioGroupCreate,
+    ScenarioGroupUpdate,
+    ScenarioGroupResponse,
+    ScenarioGroupItemCreate,
+    ScenarioGroupItemResponse
 )
 
 # Lifespan context manager for startup/shutdown events
@@ -201,6 +207,7 @@ async def create_user_response(
 ):
     """
     Submit a user response (where they chose to sit or stand).
+    If a response already exists for this session and scenario, it will be updated instead of creating a new one.
     """
     # Verify that the train configuration exists
     config_result = await db.execute(
@@ -221,21 +228,45 @@ async def create_user_response(
             detail=f"Position ({response.row}, {response.col}) is out of bounds for grid size {config.height}x{config.width}"
         )
     
-    db_response = UserResponse(
-        train_configuration_id=response.train_configuration_id,
-        row=response.row,
-        col=response.col,
-        selection_type=response.selection_type,
-        user_session_id=response.user_session_id,
-        user_id=response.user_id,
-        gender=response.gender
-    )
+    # Check if a response already exists for this session and scenario
+    existing_response = None
+    if response.user_session_id:
+        existing_result = await db.execute(
+            select(UserResponse).where(
+                UserResponse.train_configuration_id == response.train_configuration_id,
+                UserResponse.user_session_id == response.user_session_id
+            )
+        )
+        existing_response = existing_result.scalar_one_or_none()
     
-    db.add(db_response)
-    await db.commit()
-    await db.refresh(db_response)
-    
-    return db_response
+    if existing_response:
+        # Update existing response
+        existing_response.row = response.row
+        existing_response.col = response.col
+        existing_response.selection_type = response.selection_type
+        existing_response.gender = response.gender
+        # Note: user_id can be updated if provided, but typically session_id is the identifier
+        
+        await db.commit()
+        await db.refresh(existing_response)
+        return existing_response
+    else:
+        # Create new response
+        db_response = UserResponse(
+            train_configuration_id=response.train_configuration_id,
+            row=response.row,
+            col=response.col,
+            selection_type=response.selection_type,
+            user_session_id=response.user_session_id,
+            user_id=response.user_id,
+            gender=response.gender
+        )
+        
+        db.add(db_response)
+        await db.commit()
+        await db.refresh(db_response)
+        
+        return db_response
 
 
 @app.get("/user-responses", response_model=List[UserResponseResponse])
@@ -336,4 +367,330 @@ async def get_response_statistics(
         floor_selections=floor_selections,
         selection_heatmap=heatmap
     )
+
+
+# Scenario Group Endpoints
+
+@app.post("/scenario-groups", response_model=ScenarioGroupResponse, status_code=status.HTTP_201_CREATED)
+async def create_scenario_group(
+    group: ScenarioGroupCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Create a new scenario group with optional initial items.
+    """
+    # Create the scenario group
+    db_group = ScenarioGroup(
+        email=group.email
+    )
+    db.add(db_group)
+    await db.flush()  # Flush to get the ID
+    
+    # Add initial items if provided
+    if group.items:
+        # Validate that all train configurations exist
+        for item in group.items:
+            config_result = await db.execute(
+                select(TrainConfiguration).where(TrainConfiguration.id == item.train_configuration_id)
+            )
+            config = config_result.scalar_one_or_none()
+            if config is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Train configuration with id {item.train_configuration_id} not found"
+                )
+        
+        # Create items
+        for item in group.items:
+            db_item = ScenarioGroupItem(
+                scenario_group_id=db_group.id,
+                train_configuration_id=item.train_configuration_id,
+                order=item.order
+            )
+            db.add(db_item)
+    
+    await db.commit()
+    
+    # Reload with relationships
+    result = await db.execute(
+        select(ScenarioGroup)
+        .where(ScenarioGroup.id == db_group.id)
+        .options(selectinload(ScenarioGroup.items).selectinload(ScenarioGroupItem.train_configuration))
+    )
+    db_group = result.scalar_one()
+    
+    return db_group
+
+
+@app.get("/scenario-groups", response_model=List[ScenarioGroupResponse])
+async def list_scenario_groups(
+    email: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    List scenario groups, optionally filtered by email.
+    """
+    query = select(ScenarioGroup)
+    
+    if email:
+        query = query.where(ScenarioGroup.email == email)
+    
+    query = query.order_by(ScenarioGroup.created_at.desc()).offset(skip).limit(limit)
+    query = query.options(selectinload(ScenarioGroup.items).selectinload(ScenarioGroupItem.train_configuration))
+    
+    result = await db.execute(query)
+    groups = result.scalars().all()
+    
+    return groups
+
+
+@app.get("/scenario-groups/{group_id}", response_model=ScenarioGroupResponse)
+async def get_scenario_group(
+    group_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get a specific scenario group by ID.
+    """
+    result = await db.execute(
+        select(ScenarioGroup)
+        .where(ScenarioGroup.id == group_id)
+        .options(selectinload(ScenarioGroup.items).selectinload(ScenarioGroupItem.train_configuration))
+    )
+    group = result.scalar_one_or_none()
+    
+    if group is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Scenario group with id {group_id} not found"
+        )
+    
+    return group
+
+
+@app.put("/scenario-groups/{group_id}", response_model=ScenarioGroupResponse)
+async def update_scenario_group(
+    group_id: int,
+    group_update: ScenarioGroupUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update a scenario group (currently only email can be updated).
+    """
+    result = await db.execute(
+        select(ScenarioGroup).where(ScenarioGroup.id == group_id)
+    )
+    group = result.scalar_one_or_none()
+    
+    if group is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Scenario group with id {group_id} not found"
+        )
+    
+    # Update email if provided
+    if group_update.email is not None:
+        group.email = group_update.email
+    
+    await db.commit()
+    
+    # Reload with relationships
+    result = await db.execute(
+        select(ScenarioGroup)
+        .where(ScenarioGroup.id == group_id)
+        .options(selectinload(ScenarioGroup.items).selectinload(ScenarioGroupItem.train_configuration))
+    )
+    group = result.scalar_one()
+    
+    return group
+
+
+@app.delete("/scenario-groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_scenario_group(
+    group_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Delete a scenario group and all its items.
+    """
+    result = await db.execute(
+        select(ScenarioGroup).where(ScenarioGroup.id == group_id)
+    )
+    group = result.scalar_one_or_none()
+    
+    if group is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Scenario group with id {group_id} not found"
+        )
+    
+    await db.delete(group)
+    await db.commit()
+    
+    return None
+
+
+@app.post("/scenario-groups/{group_id}/items", response_model=ScenarioGroupItemResponse, status_code=status.HTTP_201_CREATED)
+async def add_scenario_group_item(
+    group_id: int,
+    item: ScenarioGroupItemCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Add an item to a scenario group.
+    """
+    # Verify group exists
+    group_result = await db.execute(
+        select(ScenarioGroup).where(ScenarioGroup.id == group_id)
+    )
+    group = group_result.scalar_one_or_none()
+    
+    if group is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Scenario group with id {group_id} not found"
+        )
+    
+    # Verify train configuration exists
+    config_result = await db.execute(
+        select(TrainConfiguration).where(TrainConfiguration.id == item.train_configuration_id)
+    )
+    config = config_result.scalar_one_or_none()
+    
+    if config is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Train configuration with id {item.train_configuration_id} not found"
+        )
+    
+    # Create the item
+    db_item = ScenarioGroupItem(
+        scenario_group_id=group_id,
+        train_configuration_id=item.train_configuration_id,
+        order=item.order
+    )
+    
+    db.add(db_item)
+    await db.commit()
+    
+    # Reload with relationship
+    result = await db.execute(
+        select(ScenarioGroupItem)
+        .where(ScenarioGroupItem.id == db_item.id)
+        .options(selectinload(ScenarioGroupItem.train_configuration))
+    )
+    db_item = result.scalar_one()
+    
+    return db_item
+
+
+@app.put("/scenario-groups/{group_id}/items/{item_id}", response_model=ScenarioGroupItemResponse)
+async def update_scenario_group_item(
+    group_id: int,
+    item_id: int,
+    item_update: ScenarioGroupItemCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update an item in a scenario group (e.g., change order or train configuration).
+    """
+    # Verify group exists
+    group_result = await db.execute(
+        select(ScenarioGroup).where(ScenarioGroup.id == group_id)
+    )
+    group = group_result.scalar_one_or_none()
+    
+    if group is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Scenario group with id {group_id} not found"
+        )
+    
+    # Verify item exists and belongs to the group
+    item_result = await db.execute(
+        select(ScenarioGroupItem).where(
+            ScenarioGroupItem.id == item_id,
+            ScenarioGroupItem.scenario_group_id == group_id
+        )
+    )
+    db_item = item_result.scalar_one_or_none()
+    
+    if db_item is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Item with id {item_id} not found in scenario group {group_id}"
+        )
+    
+    # Verify train configuration exists if it's being changed
+    if item_update.train_configuration_id != db_item.train_configuration_id:
+        config_result = await db.execute(
+            select(TrainConfiguration).where(TrainConfiguration.id == item_update.train_configuration_id)
+        )
+        config = config_result.scalar_one_or_none()
+        
+        if config is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Train configuration with id {item_update.train_configuration_id} not found"
+            )
+    
+    # Update the item
+    db_item.train_configuration_id = item_update.train_configuration_id
+    db_item.order = item_update.order
+    
+    await db.commit()
+    
+    # Reload with relationship
+    result = await db.execute(
+        select(ScenarioGroupItem)
+        .where(ScenarioGroupItem.id == item_id)
+        .options(selectinload(ScenarioGroupItem.train_configuration))
+    )
+    db_item = result.scalar_one()
+    
+    return db_item
+
+
+@app.delete("/scenario-groups/{group_id}/items/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_scenario_group_item(
+    group_id: int,
+    item_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Remove an item from a scenario group.
+    """
+    # Verify group exists
+    group_result = await db.execute(
+        select(ScenarioGroup).where(ScenarioGroup.id == group_id)
+    )
+    group = group_result.scalar_one_or_none()
+    
+    if group is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Scenario group with id {group_id} not found"
+        )
+    
+    # Verify item exists and belongs to the group
+    item_result = await db.execute(
+        select(ScenarioGroupItem).where(
+            ScenarioGroupItem.id == item_id,
+            ScenarioGroupItem.scenario_group_id == group_id
+        )
+    )
+    db_item = item_result.scalar_one_or_none()
+    
+    if db_item is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Item with id {item_id} not found in scenario group {group_id}"
+        )
+    
+    await db.delete(db_item)
+    await db.commit()
+    
+    return None
 

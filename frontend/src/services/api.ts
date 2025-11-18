@@ -197,5 +197,22 @@ export const userResponseApi = {
 
     return response.json();
   },
+
+  /**
+   * Get the user's previous response for a specific scenario and session
+   * Returns the most recent response if multiple exist
+   */
+  async getPreviousResponse(
+    train_configuration_id: number,
+    user_session_id: string
+  ): Promise<UserResponseResponse | null> {
+    const responses = await this.getAll({
+      train_configuration_id,
+      user_session_id,
+      limit: 1,
+    });
+    
+    return responses.length > 0 ? responses[0] : null;
+  },
 };
 
