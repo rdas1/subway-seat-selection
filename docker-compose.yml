@@ -27,6 +27,12 @@ services:
     container_name: subway-backend
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-subway_seat_selection}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:80,http://localhost}
     ports:
       - "8000:8000"
     depends_on:

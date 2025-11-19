@@ -15,6 +15,7 @@ class TileSchema(BaseModel):
 # Train Configuration Schemas
 class TrainConfigurationCreate(BaseModel):
     name: Optional[str] = Field(None, description="Optional name/description for the configuration")
+    title: Optional[str] = Field(None, description="Optional title for the configuration")
     height: int = Field(..., gt=0, description="Height of the grid (number of rows)")
     width: int = Field(..., gt=0, description="Width of the grid (number of columns)")
     tiles: List[List[TileSchema]] = Field(..., description="2D array of tiles representing the grid")
@@ -23,6 +24,7 @@ class TrainConfigurationCreate(BaseModel):
 class TrainConfigurationResponse(BaseModel):
     id: int
     name: Optional[str]
+    title: Optional[str]
     height: int
     width: int
     tiles: List[List[Dict[str, Any]]]  # JSON representation
@@ -87,20 +89,86 @@ class ScenarioGroupItemResponse(BaseModel):
 
 
 class ScenarioGroupCreate(BaseModel):
-    email: str = Field(..., description="Email address for the scenario group")
     items: Optional[List[ScenarioGroupItemCreate]] = Field(default=[], description="Optional list of scenarios to add initially")
 
 
 class ScenarioGroupUpdate(BaseModel):
-    email: Optional[str] = Field(None, description="Email address for the scenario group")
+    # Currently no updatable fields, but keeping structure for future
+    pass
 
 
 class ScenarioGroupResponse(BaseModel):
     id: int
-    email: str
+    created_by_user_id: int
     created_at: datetime
     updated_at: Optional[datetime]
     items: List[ScenarioGroupItemResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+# Authentication Schemas
+class SendVerificationRequest(BaseModel):
+    email: str = Field(..., description="Email address to send verification to")
+    verification_type: Literal["magic_link", "token", "both"] = Field(..., description="Type of verification to send")
+
+
+class VerifyTokenRequest(BaseModel):
+    email: str = Field(..., description="Email address")
+    verification_code: str = Field(..., description="6-digit verification code")
+
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AuthResponse(BaseModel):
+    user: UserResponse
+    message: str = "Authentication successful"
+
+
+class ScenarioGroupEditorResponse(BaseModel):
+    id: int
+    scenario_group_id: int
+    user_id: int
+    created_at: datetime
+    user: Optional[UserResponse] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Study Schemas
+class StudyCreate(BaseModel):
+    title: str = Field(..., description="Title of the study")
+    description: Optional[str] = Field(None, description="Optional description of the study")
+    email: str = Field(..., description="Email for study participants")
+    scenario_group_id: int = Field(..., description="ID of the scenario group to associate with this study")
+
+
+class StudyUpdate(BaseModel):
+    title: Optional[str] = Field(None, description="Title of the study")
+    description: Optional[str] = Field(None, description="Optional description of the study")
+    email: Optional[str] = Field(None, description="Email for study participants")
+    scenario_group_id: Optional[int] = Field(None, description="ID of the scenario group to associate with this study")
+
+
+class StudyResponse(BaseModel):
+    id: int
+    title: str
+    description: Optional[str]
+    email: str
+    scenario_group_id: int
+    created_by_user_id: int
+    created_at: datetime
+    updated_at: Optional[datetime]
+    scenario_group: Optional[ScenarioGroupResponse] = None
 
     class Config:
         from_attributes = True

@@ -6,6 +6,72 @@
   box-sizing: border-box;
 }
 
+.scenario-editor-back-button {
+  background-color: transparent;
+  border: 1px solid #565658;
+  color: #d7dadc;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 1.5rem;
+}
+
+.scenario-editor-back-button:hover {
+  background-color: #3a3a3c;
+  border-color: #4a90e2;
+  color: white;
+}
+
+.scenario-title-section {
+  margin-bottom: 1.5rem;
+}
+
+.scenario-title-section .last-saved-indicator {
+  color: #a0a0a0;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+  font-style: italic;
+}
+
+.scenario-title-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.scenario-title-input {
+  flex: 1;
+  background-color: transparent;
+  border: none;
+  border-bottom: 2px solid #565658;
+  color: white;
+  font-size: 2rem;
+  font-weight: 600;
+  padding: 0.5rem 0;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+
+.scenario-title-input:focus {
+  outline: none;
+  border-bottom-color: #4a90e2;
+}
+
+.scenario-title-input::placeholder {
+  color: #565658;
+  font-weight: 400;
+  font-style: italic;
+}
+
+.scenario-title-section .saving-indicator {
+  color: #4a90e2;
+  font-size: 0.9rem;
+  font-style: italic;
+  white-space: nowrap;
+}
+
 .scenario-editor-header {
   text-align: center;
   margin-bottom: 2rem;
@@ -180,6 +246,27 @@
   padding: 0.75rem 1rem;
   margin-bottom: 0;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  animation: slideDown 0.3s ease-out, fadeOut 0.3s ease-out 2.7s forwards;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 /* When banner is present, adjust tile-selector-header position */
@@ -242,13 +329,51 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: background 0.2s;
-  flex-shrink: 0;
 }
 
 .close-banner-button:hover {
-  background: rgba(21, 87, 36, 0.1);
+  color: #0d3e1a;
+}
+
+/* Permanent scenario links section */
+.scenario-links-section {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.scenario-link-plain {
+  color: #4a90e2;
+  text-decoration: none;
+  font-size: 0.95rem;
+  transition: color 0.2s;
+}
+
+.scenario-link-plain:hover {
+  color: #357abd;
+  text-decoration: underline;
+}
+
+.copy-link-button-plain {
+  background: transparent;
+  border: 1px solid #565658;
+  color: #d7dadc;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.copy-link-button-plain:hover {
+  background-color: #3a3a3c;
+  border-color: #4a90e2;
+  color: white;
 }
 
 .tile-selector-header {
@@ -322,16 +447,21 @@
   flex-direction: column;
   align-items: center;
   gap: 0.25rem;
-  cursor: pointer;
+  cursor: grab;
   padding: 0.5rem;
   border-radius: 6px;
   transition: all 0.2s;
   border: 2px solid transparent;
   flex-shrink: 0;
+  user-select: none;
 }
 
 .tile-selector-item:hover {
   background: #4a4a4c;
+}
+
+.tile-selector-item:active {
+  cursor: grabbing;
 }
 
 .tile-selector-item.active {
@@ -647,13 +777,16 @@
     font-size: 0.85rem;
   }
 
-  .save-success-message .scenario-link {
-    display: block;
-    margin-left: 0;
-    margin-top: 0.25rem;
+  .scenario-links-section {
+    gap: 0.75rem;
+    padding: 0.5rem 0;
   }
 
-  .copy-link-button {
+  .scenario-link-plain {
+    font-size: 0.85rem;
+  }
+
+  .copy-link-button-plain {
     padding: 0.35rem 0.75rem;
     font-size: 0.8rem;
   }

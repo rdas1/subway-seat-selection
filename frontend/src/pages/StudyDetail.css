@@ -1,0 +1,221 @@
+.study-detail {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem;
+  min-height: calc(100vh - 60px);
+}
+
+.study-detail-container {
+  max-width: 1200px;
+  width: 100%;
+  background-color: transparent;
+  border-radius: 8px;
+  padding: 2rem;
+}
+
+.last-saved-indicator {
+  color: #a0a0a0;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+  font-style: italic;
+}
+
+.study-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.study-title-input {
+  flex: 1;
+  background-color: transparent;
+  border: none;
+  border-bottom: 2px solid #565658;
+  color: white;
+  font-size: 2rem;
+  font-weight: 600;
+  padding: 0.5rem 0;
+  transition: border-color 0.2s;
+  font-family: inherit;
+}
+
+.study-title-input:focus {
+  outline: none;
+  border-bottom-color: #4a90e2;
+}
+
+.study-title-input::placeholder {
+  color: #565658;
+}
+
+.saving-indicator {
+  color: #4a90e2;
+  font-size: 0.9rem;
+  font-style: italic;
+  white-space: nowrap;
+}
+
+.study-description-input {
+  width: 100%;
+  background-color: transparent;
+  border: none;
+  border-bottom: 1px solid #3a3a3c;
+  color: #a0a0a0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  padding: 0.5rem 0;
+  font-family: inherit;
+  resize: vertical;
+  transition: all 0.2s;
+  min-height: 60px;
+}
+
+.study-description-input:focus {
+  outline: none;
+  border-bottom-color: #4a90e2;
+  color: #d7dadc;
+}
+
+.study-description-input::placeholder {
+  color: #565658;
+  font-style: italic;
+}
+
+/* Scenarios Section */
+.scenarios-section {
+  margin-top: 3rem;
+}
+
+.scenarios-section-title {
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 1.5rem 0;
+}
+
+.scenarios-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.5rem;
+}
+
+.scenario-card {
+  background-color: #2a2a2c;
+  border-radius: 8px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid #3a3a3c;
+}
+
+.scenario-card:hover {
+  background-color: #323234;
+  border-color: #4a90e2;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.scenario-card-create {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+  border: 2px dashed #565658;
+  background-color: #1f1f21;
+}
+
+.scenario-card-create:hover {
+  border-color: #4a90e2;
+  background-color: #252527;
+}
+
+.scenario-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.scenario-card-plus {
+  font-size: 2.5rem;
+  font-weight: 300;
+  color: #4a90e2;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.scenario-card h3 {
+  margin: 0;
+  color: white;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.scenario-card-create h3 {
+  color: #4a90e2;
+  text-align: center;
+}
+
+.scenario-card-info {
+  margin: 0;
+  color: #a0a0a0;
+  font-size: 0.85rem;
+}
+
+.back-button {
+  background-color: transparent;
+  border: 1px solid #565658;
+  color: #d7dadc;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 1.5rem;
+}
+
+.back-button:hover {
+  background-color: #3a3a3c;
+  border-color: #4a90e2;
+  color: white;
+}
+
+.error-message {
+  padding: 1rem;
+  background-color: rgba(220, 53, 69, 0.2);
+  border-left: 3px solid #dc3545;
+  border-radius: 4px;
+  color: #ff6b6b;
+  margin-bottom: 1rem;
+}
+
+.error-message p {
+  margin: 0;
+  font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+  .study-detail {
+    padding: 1rem;
+  }
+
+  .study-detail-container {
+    padding: 1.5rem;
+  }
+
+  .study-title-input {
+    font-size: 1.5rem;
+  }
+
+  .scenarios-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .scenarios-section-title {
+    font-size: 1.25rem;
+  }
+}
+

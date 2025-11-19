@@ -22,6 +22,7 @@ export default function ScenarioPage() {
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
   const [scenarioName, setScenarioName] = useState<string | null>(null)
+  const [scenarioTitle, setScenarioTitle] = useState<string | null>(null)
   const [scenarioId, setScenarioId] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState<boolean>(false)
   const [submitSuccess, setSubmitSuccess] = useState<boolean>(false)
@@ -74,7 +75,8 @@ export default function ScenarioPage() {
           setGrid(subwayGrid)
           setScenarioId(config.id)
           setScenarioName(config.name || null)
-          console.log('Random scenario loaded with ID:', config.id, 'Name:', config.name)
+          setScenarioTitle(config.title || null)
+          console.log('Random scenario loaded with ID:', config.id, 'Name:', config.name, 'Title:', config.title)
           
           // Check if user has already responded to this scenario (for hiding platform user indicator)
           try {
@@ -137,6 +139,7 @@ export default function ScenarioPage() {
         const subwayGrid = new SubwayGrid(config.height, config.width, config.tiles)
         setGrid(subwayGrid)
         setScenarioName(config.name || null)
+        setScenarioTitle(config.title || null)
         setScenarioId(scenarioId)
         console.log('Scenario ID set for responses:', scenarioId)
         
@@ -381,7 +384,7 @@ export default function ScenarioPage() {
             </>
           ) : grid ? (
             <>
-              {scenarioName && <h1>{scenarioName}</h1>}
+              {scenarioTitle && <h1 className="scenario-title">{scenarioTitle}</h1>}
               <h1 className="main-header-prompt">Your train is here! Where will you sit (or stand)?</h1>
             </>
           ) : loading || !grid ? (

@@ -1,7 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { SubwayGrid } from '../classes/SubwayGrid';
 import { Tile } from '../types/grid';
 import { trainConfigApi, TrainConfigurationResponse } from '../services/api';
+import { formatRelativeTime } from '../utils/time';
 import Grid from './Grid';
 import './ScenarioEditor.css';
 
@@ -10,19 +12,27 @@ interface ScenarioEditorProps {
 }
 
 export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
+  const { id } = useParams<{ id?: string }>()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const studyId = searchParams.get('studyId')
   const [grid, setGrid] = useState<SubwayGrid | null>(initialGrid || null);
   const [name, setName] = useState<string>('');
+  const [title, setTitle] = useState<string>('');
   const [selectedMode, setSelectedMode] = useState<'seat' | 'floor' | 'stanchion' | 'barrier' | 'man' | 'woman' | 'neutral' | 'eraser'>('neutral');
   const [capacity, setCapacity] = useState<number>(50);
   const [menPercentage, setMenPercentage] = useState<number>(50);
   const [womenPercentage, setWomenPercentage] = useState<number>(50);
   const [manuallyPlacedPeople, setManuallyPlacedPeople] = useState<Set<string>>(new Set()); // Track manually placed people by "row-col" key
   const [saving, setSaving] = useState(false);
+  const [savingTitle, setSavingTitle] = useState(false);
   const [savedConfig, setSavedConfig] = useState<TrainConfigurationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [showSaveBanner, setShowSaveBanner] = useState(false);
   const [gridHeight, setGridHeight] = useState<number>(20);
   const [gridWidth, setGridWidth] = useState<number>(5);
+  const titleDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Initialize grid with sample pattern if dimensions match, otherwise empty
   const initializeGrid = useCallback((height: number, width: number) => {
@@ -323,14 +333,32 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
     e.dataTransfer.setData('text/plain', JSON.stringify({ row, col, person: tile.person }));
   }, [grid]);
 
+  // Handle drag start from tile selector
+  const handleSelectorDragStart = useCallback((tileType: 'seat' | 'floor' | 'stanchion' | 'barrier' | 'man' | 'woman' | 'neutral' | 'eraser', e: React.DragEvent) => {
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', JSON.stringify({ fromSelector: true, tileType }));
+  }, []);
+
   const handleDragOver = useCallback((row: number, col: number, e: React.DragEvent) => {
     if (!grid) return;
     
     const tile = grid.getTile(row, col);
-    // Only allow drop on eligible tiles (seats and floor, not barriers)
-    if (tile && tile.type !== 'barrier' && !tile.isDoor && !tile.isStanchion) {
+    if (!tile) return;
+    
+    // Check effectAllowed to determine drag source
+    // 'copy' means from selector, 'move' means from grid
+    const effectAllowed = e.dataTransfer.effectAllowed;
+    
+    if (effectAllowed === 'copy') {
+      // Drag from tile selector - allow drop on all tiles
       e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
+      e.dataTransfer.dropEffect = 'copy';
+    } else if (effectAllowed === 'move') {
+      // Drag from grid - only allow on eligible tiles (not barriers)
+      if (tile.type !== 'barrier' && !tile.isDoor && !tile.isStanchion) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }
     }
   }, [grid]);
 
@@ -341,6 +369,119 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
     
     try {
       const dragData = JSON.parse(e.dataTransfer.getData('text/plain'));
+      
+      // Check if this is a drag from the tile selector
+      if (dragData.fromSelector === true) {
+        const tileType = dragData.tileType;
+        const targetTile = grid.getTile(row, col);
+        if (!targetTile) return;
+        
+        // Handle eraser
+        if (tileType === 'eraser') {
+          const newTiles = grid.tiles.map((r, rIdx) =>
+            r.map((t, cIdx) => {
+              if (rIdx === row && cIdx === col) {
+                const newTile: Tile = { ...t };
+                if (t.occupied && t.person) {
+                  newTile.occupied = false;
+                  newTile.person = undefined;
+                  const key = `${row}-${col}`;
+                  setManuallyPlacedPeople(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(key);
+                    return newSet;
+                  });
+                } else {
+                  newTile.type = 'floor';
+                  newTile.isDoor = false;
+                  newTile.isStanchion = false;
+                }
+                return newTile;
+              }
+              return t;
+            })
+          );
+          setGrid(new SubwayGrid(grid.height, grid.width, newTiles));
+          return;
+        }
+        
+        // Handle person types
+        if (tileType === 'man' || tileType === 'woman' || tileType === 'neutral') {
+          if (targetTile.type === 'barrier') return;
+          
+          const newTiles = grid.tiles.map((r, rIdx) =>
+            r.map((t, cIdx) => {
+              if (rIdx === row && cIdx === col) {
+                const newTile: Tile = { ...t };
+                if (t.occupied && t.person === tileType) {
+                  newTile.occupied = false;
+                  newTile.person = undefined;
+                  const key = `${row}-${col}`;
+                  setManuallyPlacedPeople(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(key);
+                    return newSet;
+                  });
+                } else {
+                  newTile.occupied = true;
+                  newTile.person = tileType;
+                  const key = `${row}-${col}`;
+                  setManuallyPlacedPeople(prev => {
+                    const newSet = new Set(prev);
+                    newSet.add(key);
+                    return newSet;
+                  });
+                }
+                return newTile;
+              }
+              return t;
+            })
+          );
+          setGrid(new SubwayGrid(grid.height, grid.width, newTiles));
+          return;
+        }
+        
+        // Handle tile types (seat, floor, stanchion, barrier)
+        if (tileType === 'seat' || tileType === 'floor' || tileType === 'stanchion' || tileType === 'barrier') {
+          const newTiles = grid.tiles.map((r, rIdx) =>
+            r.map((t, cIdx) => {
+              if (rIdx === row && cIdx === col) {
+                const newTile: Tile = { ...t };
+                newTile.type = tileType;
+                if (tileType === 'floor') {
+                  newTile.isDoor = false;
+                  newTile.isStanchion = false;
+                } else if (tileType === 'stanchion') {
+                  newTile.isStanchion = true;
+                  newTile.isDoor = false;
+                } else {
+                  newTile.isDoor = false;
+                  newTile.isStanchion = false;
+                }
+                // Clear person if placing a barrier
+                if (tileType === 'barrier') {
+                  newTile.occupied = false;
+                  newTile.person = undefined;
+                  const key = `${row}-${col}`;
+                  setManuallyPlacedPeople(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(key);
+                    return newSet;
+                  });
+                }
+                return newTile;
+              }
+              return t;
+            })
+          );
+          setGrid(new SubwayGrid(grid.height, grid.width, newTiles));
+          return;
+        }
+        
+        return;
+      }
+      
+      // Handle grid-to-grid drag (existing logic)
       const sourceRow = dragData.row;
       const sourceCol = dragData.col;
       const personType = dragData.person;
@@ -537,14 +678,37 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
     setError(null);
 
     try {
-      const config = await trainConfigApi.create({
-        name: name || undefined,
-        height: grid.height,
-        width: grid.width,
-        tiles: grid.tiles,
-      });
+      // Check if we're editing an existing scenario
+      const scenarioId = id ? parseInt(id, 10) : (savedConfig?.id);
+      
+      let config: TrainConfigurationResponse;
+      if (scenarioId && !isNaN(scenarioId)) {
+        // Update existing scenario
+        config = await trainConfigApi.update(scenarioId, {
+          name: name || undefined,
+          title: title || undefined,
+          height: grid.height,
+          width: grid.width,
+          tiles: grid.tiles,
+        });
+      } else {
+        // Create new scenario
+        config = await trainConfigApi.create({
+          name: name || undefined,
+          title: title || undefined,
+          height: grid.height,
+          width: grid.width,
+          tiles: grid.tiles,
+        });
+      }
 
       setSavedConfig(config);
+      // updated_at will be in the config response, which will update the "Last saved" indicator
+      // Show temporary save banner
+      setShowSaveBanner(true);
+      setTimeout(() => {
+        setShowSaveBanner(false);
+      }, 3000); // Hide after 3 seconds
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save scenario');
     } finally {
@@ -552,11 +716,12 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
     }
   };
 
-  const handleLoad = async (id: number) => {
+  const handleLoad = async (scenarioId: number) => {
     try {
-      const config = await trainConfigApi.getById(id);
+      const config = await trainConfigApi.getById(scenarioId);
       setGrid(new SubwayGrid(config.height, config.width, config.tiles));
       setName(config.name || '');
+      setTitle(config.title || '');
       setSavedConfig(config);
       setError(null);
     } catch (err) {
@@ -564,8 +729,82 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
     }
   };
 
+  // Debounced update function for title
+  const debouncedUpdateTitle = useCallback(async (newTitle: string) => {
+    // Only save if we have a saved config (scenario exists in DB)
+    if (!savedConfig?.id) return;
+
+    setSavingTitle(true);
+    try {
+      const scenarioId = savedConfig.id;
+      const updatedConfig = await trainConfigApi.update(scenarioId, {
+        name: name || undefined,
+        title: newTitle || undefined,
+        height: grid!.height,
+        width: grid!.width,
+        tiles: grid!.tiles,
+      });
+      setSavedConfig(updatedConfig);
+      // Update local state to match server response
+      setTitle(updatedConfig.title || '');
+      // updated_at will be updated in savedConfig, which will trigger re-render
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update title');
+    } finally {
+      setSavingTitle(false);
+    }
+  }, [savedConfig, name, grid]);
+
+  // Handle title change with debouncing
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTitle = e.target.value;
+    setTitle(newTitle);
+
+    // Clear existing timer
+    if (titleDebounceTimerRef.current) {
+      clearTimeout(titleDebounceTimerRef.current);
+    }
+
+    // Only debounce if we have a saved config (scenario exists in DB)
+    if (savedConfig?.id) {
+      // Set new timer
+      titleDebounceTimerRef.current = setTimeout(() => {
+        debouncedUpdateTitle(newTitle);
+      }, 500); // 500ms debounce
+    }
+  };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (titleDebounceTimerRef.current) {
+        clearTimeout(titleDebounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Load scenario if ID is provided in route (but not if initialGrid is provided)
+  useEffect(() => {
+    if (id && !initialGrid) {
+      const scenarioId = parseInt(id, 10);
+      if (!isNaN(scenarioId)) {
+        handleLoad(scenarioId);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, initialGrid]);
+
   return (
     <div className="scenario-editor">
+      {/* Back button if coming from study detail */}
+      {studyId && (
+        <button 
+          onClick={() => navigate(`/study-builder/${studyId}`)} 
+          className="scenario-editor-back-button"
+        >
+          ← Back to Study
+        </button>
+      )}
       {/* <div className="scenario-editor-header">
         <h1>Scenario Editor</h1>
         <p>Create and share subway train configurations</p>
@@ -574,55 +813,85 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
 
 
       {grid ? (
-        <div className={`scenario-editor-grid-wrapper ${savedConfig ? 'has-banner' : ''}`}>
-          {savedConfig && (
+        <div className={`scenario-editor-grid-wrapper ${showSaveBanner ? 'has-banner' : ''}`}>
+          {/* Title input */}
+          <div className="scenario-title-section">
+            {(savingTitle || savedConfig?.updated_at) && (
+              <div className="last-saved-indicator">
+                {savingTitle ? (
+                  'Saving...'
+                ) : savedConfig?.updated_at ? (
+                  `Last saved ${formatRelativeTime(savedConfig.updated_at)}`
+                ) : null}
+              </div>
+            )}
+            <div className="scenario-title-header">
+              <input
+                type="text"
+                value={title}
+                onChange={handleTitleChange}
+                className="scenario-title-input"
+                placeholder="Scenario title (optional)"
+              />
+              {savingTitle && <span className="saving-indicator">Saving...</span>}
+            </div>
+          </div>
+
+          {/* Temporary save banner */}
+          {showSaveBanner && savedConfig && (
             <div className="save-success-banner">
               <div className="save-success-content">
                 <span className="save-success-message">
-                  ✓ Scenario {savedConfig.id} saved! 
-                  <a 
-                    href={`/scenario/${savedConfig.id}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="scenario-link"
-                  >
-                    View scenario
-                  </a>
+                  ✓ Scenario {savedConfig.id} saved!
                 </span>
                 <button
-                  className="copy-link-button"
-                  onClick={() => {
-                    const url = `${window.location.origin}/scenario/${savedConfig.id}`;
-                    navigator.clipboard.writeText(url).then(() => {
-                      setLinkCopied(true);
-                      setTimeout(() => {
-                        setLinkCopied(false);
-                      }, 2000);
-                    }).catch(() => {
-                      // Fallback for older browsers
-                      const textArea = document.createElement('textarea');
-                      textArea.value = url;
-                      document.body.appendChild(textArea);
-                      textArea.select();
-                      document.execCommand('copy');
-                      document.body.removeChild(textArea);
-                      setLinkCopied(true);
-                      setTimeout(() => {
-                        setLinkCopied(false);
-                      }, 2000);
-                    });
-                  }}
-                >
-                  {linkCopied ? 'Copied!' : 'Copy Link'}
-                </button>
-                <button
                   className="close-banner-button"
-                  onClick={() => setSavedConfig(null)}
+                  onClick={() => setShowSaveBanner(false)}
                   aria-label="Close banner"
                 >
                   ×
                 </button>
               </div>
+            </div>
+          )}
+          
+          {/* Permanent links for existing scenarios */}
+          {savedConfig && (
+            <div className="scenario-links-section">
+              <a 
+                href={`/scenario/${savedConfig.id}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="scenario-link-plain"
+              >
+                View Scenario
+              </a>
+              <button
+                className="copy-link-button-plain"
+                onClick={() => {
+                  const url = `${window.location.origin}/scenario/${savedConfig.id}`;
+                  navigator.clipboard.writeText(url).then(() => {
+                    setLinkCopied(true);
+                    setTimeout(() => {
+                      setLinkCopied(false);
+                    }, 2000);
+                  }).catch(() => {
+                    // Fallback for older browsers
+                    const textArea = document.createElement('textarea');
+                    textArea.value = url;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    setLinkCopied(true);
+                    setTimeout(() => {
+                      setLinkCopied(false);
+                    }, 2000);
+                  });
+                }}
+              >
+                {linkCopied ? 'Copied!' : 'Copy Link'}
+              </button>
             </div>
           )}
           <div className="tile-selector-header">
@@ -631,6 +900,8 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
               <div
                 className={`tile-selector-item ${selectedMode === 'man' ? 'active' : ''}`}
                 onClick={() => setSelectedMode('man')}
+                draggable
+                onDragStart={(e) => handleSelectorDragStart('man', e)}
               >
                 <div className="tile-selector-preview person-preview">
                   <span className="person-emoji-preview">👨</span>
@@ -640,6 +911,8 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
               <div
                 className={`tile-selector-item ${selectedMode === 'woman' ? 'active' : ''}`}
                 onClick={() => setSelectedMode('woman')}
+                draggable
+                onDragStart={(e) => handleSelectorDragStart('woman', e)}
               >
                 <div className="tile-selector-preview person-preview">
                   <span className="person-emoji-preview">👩</span>
@@ -649,6 +922,8 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
               <div
                 className={`tile-selector-item ${selectedMode === 'neutral' ? 'active' : ''}`}
                 onClick={() => setSelectedMode('neutral')}
+                draggable
+                onDragStart={(e) => handleSelectorDragStart('neutral', e)}
               >
                 <div className="tile-selector-preview person-preview">
                   <span className="person-emoji-preview">🧑</span>
@@ -658,6 +933,8 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
               <div
                 className={`tile-selector-item ${selectedMode === 'seat' ? 'active' : ''}`}
                 onClick={() => setSelectedMode('seat')}
+                draggable
+                onDragStart={(e) => handleSelectorDragStart('seat', e)}
               >
                 <div className="tile-selector-preview tile-seat-preview"></div>
                 <span>Seat</span>
@@ -665,6 +942,8 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
               <div
                 className={`tile-selector-item ${selectedMode === 'floor' ? 'active' : ''}`}
                 onClick={() => setSelectedMode('floor')}
+                draggable
+                onDragStart={(e) => handleSelectorDragStart('floor', e)}
               >
                 <div className="tile-selector-preview tile-floor-preview"></div>
                 <span>Floor</span>
@@ -672,6 +951,8 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
               <div
                 className={`tile-selector-item ${selectedMode === 'stanchion' ? 'active' : ''}`}
                 onClick={() => setSelectedMode('stanchion')}
+                draggable
+                onDragStart={(e) => handleSelectorDragStart('stanchion', e)}
               >
                 <div className="tile-selector-preview tile-stanchion-preview"></div>
                 <span>Stanchion</span>
@@ -679,6 +960,8 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
               <div
                 className={`tile-selector-item ${selectedMode === 'barrier' ? 'active' : ''}`}
                 onClick={() => setSelectedMode('barrier')}
+                draggable
+                onDragStart={(e) => handleSelectorDragStart('barrier', e)}
               >
                 <div className="tile-selector-preview tile-barrier-preview"></div>
                 <span>Barrier</span>
@@ -686,6 +969,8 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
               <div
                 className={`tile-selector-item ${selectedMode === 'eraser' ? 'active' : ''}`}
                 onClick={() => setSelectedMode('eraser')}
+                draggable
+                onDragStart={(e) => handleSelectorDragStart('eraser', e)}
               >
                 <div className="tile-selector-preview eraser-preview">
                   <span className="eraser-icon">❌</span>

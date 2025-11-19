@@ -1,40 +1,79 @@
+import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
 import './App.css'
 import HomePage from './pages/HomePage'
 import ScenarioEditor from './components/ScenarioEditor'
 import ScenarioPage from './pages/ScenarioPage'
 import StudyBuilder from './pages/StudyBuilder'
+import StudyDetail from './pages/StudyDetail'
+import VerificationPage from './pages/VerificationPage'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 
 export type PlayerGender = 'man' | 'woman' | 'neutral'
 
 function Navigation() {
   const location = useLocation()
+  const { user, logout } = useAuth()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  const handleLogout = async () => {
+    await logout()
+    setMobileMenuOpen(false)
+  }
+
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(!mobileMenuOpen)
+  }
+
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false)
+  }
 
   return (
     <nav className="main-navigation">
       <div className="nav-container">
-        <Link to="/" className="nav-logo">
+        <Link to="/" className="nav-logo" onClick={closeMobileMenu}>
           Subway Simulator
         </Link>
-        <div className="nav-links">
+        <button 
+          className="nav-hamburger"
+          onClick={toggleMobileMenu}
+          aria-label="Toggle menu"
+        >
+          <span className={`hamburger-line ${mobileMenuOpen ? 'open' : ''}`}></span>
+          <span className={`hamburger-line ${mobileMenuOpen ? 'open' : ''}`}></span>
+          <span className={`hamburger-line ${mobileMenuOpen ? 'open' : ''}`}></span>
+        </button>
+        <div className={`nav-links ${mobileMenuOpen ? 'mobile-open' : ''}`}>
           <Link 
             to="/" 
             className={location.pathname === '/' ? 'active' : ''}
+            onClick={closeMobileMenu}
           >
             Home
           </Link>
           <Link 
             to="/scenario-editor" 
             className={location.pathname === '/scenario-editor' ? 'active' : ''}
+            onClick={closeMobileMenu}
           >
             Scenario Editor
           </Link>
           <Link 
             to="/study-builder" 
             className={location.pathname === '/study-builder' ? 'active' : ''}
+            onClick={closeMobileMenu}
           >
             Study Builder
           </Link>
+          {user && (
+            <>
+              <span className="nav-user-email">{user.email}</span>
+              <button onClick={handleLogout} className="nav-logout-button">
+                Logout
+              </button>
+            </>
+          )}
         </div>
       </div>
     </nav>
@@ -43,18 +82,23 @@ function Navigation() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <div className="App">
-        <Navigation />
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/scenario-editor" element={<ScenarioEditor />} />
-          <Route path="/study-builder" element={<StudyBuilder />} />
-          <Route path="/scenario/:id" element={<ScenarioPage />} />
-          <Route path="/scenario" element={<ScenarioPage />} />
-        </Routes>
-      </div>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <div className="App">
+          <Navigation />
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/scenario-editor" element={<ScenarioEditor />} />
+            <Route path="/scenario-editor/:id" element={<ScenarioEditor />} />
+            <Route path="/verify" element={<VerificationPage />} />
+            <Route path="/study-builder" element={<StudyBuilder />} />
+            <Route path="/study-builder/:id" element={<StudyDetail />} />
+            <Route path="/scenario/:id" element={<ScenarioPage />} />
+            <Route path="/scenario" element={<ScenarioPage />} />
+          </Routes>
+        </div>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }
 
