@@ -9,12 +9,13 @@ import StudyDetail from './pages/StudyDetail'
 import VerificationPage from './pages/VerificationPage'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 
-export type PlayerGender = 'man' | 'woman' | 'neutral'
+export type PlayerGender = 'man' | 'woman' | 'neutral' | 'prefer-not-to-say'
 
 function Navigation() {
   const location = useLocation()
   const { user, logout } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [createDropdownOpen, setCreateDropdownOpen] = useState(false)
 
   const handleLogout = async () => {
     await logout()
@@ -23,11 +24,19 @@ function Navigation() {
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen)
+    setCreateDropdownOpen(false)
   }
 
   const closeMobileMenu = () => {
     setMobileMenuOpen(false)
+    setCreateDropdownOpen(false)
   }
+
+  const toggleCreateDropdown = () => {
+    setCreateDropdownOpen(!createDropdownOpen)
+  }
+
+  const isCreateActive = location.pathname.startsWith('/scenario-editor') || location.pathname.startsWith('/study-builder')
 
   return (
     <nav className="main-navigation">
@@ -52,20 +61,57 @@ function Navigation() {
           >
             Home
           </Link>
-          <Link 
-            to="/scenario-editor" 
-            className={location.pathname === '/scenario-editor' ? 'active' : ''}
-            onClick={closeMobileMenu}
-          >
-            Scenario Editor
-          </Link>
-          <Link 
-            to="/study-builder" 
-            className={location.pathname === '/study-builder' ? 'active' : ''}
-            onClick={closeMobileMenu}
-          >
-            Study Builder
-          </Link>
+          <div className="nav-dropdown">
+            <button 
+              className={`nav-dropdown-toggle ${isCreateActive ? 'active' : ''}`}
+              onClick={toggleCreateDropdown}
+              onBlur={() => setTimeout(() => setCreateDropdownOpen(false), 200)}
+            >
+              Create
+              <span className="nav-dropdown-icon">{createDropdownOpen ? '▲' : '▼'}</span>
+            </button>
+            {createDropdownOpen && (
+              <div className="nav-dropdown-menu">
+                <Link 
+                  to="/scenario-editor" 
+                  className={location.pathname.startsWith('/scenario-editor') ? 'active' : ''}
+                  onClick={() => {
+                    setCreateDropdownOpen(false)
+                    closeMobileMenu()
+                  }}
+                >
+                  Scenario
+                </Link>
+                <Link 
+                  to="/study-builder" 
+                  className={location.pathname.startsWith('/study-builder') ? 'active' : ''}
+                  onClick={() => {
+                    setCreateDropdownOpen(false)
+                    closeMobileMenu()
+                  }}
+                >
+                  Study
+                </Link>
+              </div>
+            )}
+          </div>
+          {/* Mobile: show dropdown items directly */}
+          <div className="nav-dropdown-mobile">
+            <Link 
+              to="/scenario-editor" 
+              className={location.pathname.startsWith('/scenario-editor') ? 'active' : ''}
+              onClick={closeMobileMenu}
+            >
+              Scenario
+            </Link>
+            <Link 
+              to="/study-builder" 
+              className={location.pathname.startsWith('/study-builder') ? 'active' : ''}
+              onClick={closeMobileMenu}
+            >
+              Study
+            </Link>
+          </div>
           {user && (
             <>
               <span className="nav-user-email">{user.email}</span>
@@ -83,21 +129,21 @@ function Navigation() {
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <div className="App">
-          <Navigation />
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/scenario-editor" element={<ScenarioEditor />} />
+    <BrowserRouter>
+      <div className="App">
+        <Navigation />
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/scenario-editor" element={<ScenarioEditor />} />
             <Route path="/scenario-editor/:id" element={<ScenarioEditor />} />
             <Route path="/verify" element={<VerificationPage />} />
             <Route path="/study-builder" element={<StudyBuilder />} />
             <Route path="/study-builder/:id" element={<StudyDetail />} />
-            <Route path="/scenario/:id" element={<ScenarioPage />} />
-            <Route path="/scenario" element={<ScenarioPage />} />
-          </Routes>
-        </div>
-      </BrowserRouter>
+          <Route path="/scenario/:id" element={<ScenarioPage />} />
+          <Route path="/scenario" element={<ScenarioPage />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
     </AuthProvider>
   )
 }

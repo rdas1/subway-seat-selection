@@ -17,6 +17,8 @@ export default function StudyBuilder() {
   const [loadingStudies, setLoadingStudies] = useState<boolean>(false)
   const [studiesError, setStudiesError] = useState<string | null>(null)
   const [creatingStudy, setCreatingStudy] = useState<boolean>(false)
+  const [deleteConfirmStudy, setDeleteConfirmStudy] = useState<{ id: number; title: string } | null>(null)
+  const [deleting, setDeleting] = useState<boolean>(false)
 
   // Load studies when user is authenticated - must be before any conditional returns
   useEffect(() => {
@@ -187,6 +189,35 @@ export default function StudyBuilder() {
     }
   }
 
+  // Handle deleting a study
+  const handleDeleteStudy = async (studyId: number, studyTitle: string) => {
+    setDeleteConfirmStudy({ id: studyId, title: studyTitle })
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmStudy) return
+
+    setDeleting(true)
+    setStudiesError(null)
+
+    try {
+      await studyApi.delete(deleteConfirmStudy.id)
+      
+      // Remove the study from the local state
+      setStudies(studies.filter(study => study.id !== deleteConfirmStudy.id))
+      
+      setDeleteConfirmStudy(null)
+    } catch (err) {
+      setStudiesError(err instanceof Error ? err.message : 'Failed to delete study')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const cancelDelete = () => {
+    setDeleteConfirmStudy(null)
+  }
+
   return (
     <div className="study-builder">
       <div className="study-builder-container">
@@ -217,6 +248,16 @@ export default function StudyBuilder() {
                 className="study-card"
                 onClick={() => navigate(`/study-builder/${study.id}`)}
               >
+                <button
+                  className="study-card-delete"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteStudy(study.id, study.title)
+                  }}
+                  aria-label="Delete study"
+                >
+                  ×
+                </button>
                 <div className="study-card-content">
                   <h3>{study.title}</h3>
                   {study.description && (
@@ -229,6 +270,31 @@ export default function StudyBuilder() {
           </div>
         )}
       </div>
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmStudy && (
+        <div className="delete-confirm-overlay" onClick={cancelDelete}>
+          <div className="delete-confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete Study?</h3>
+            <p>Are you sure you want to delete "{deleteConfirmStudy.title}"? This action cannot be undone.</p>
+            <div className="delete-confirm-buttons">
+              <button 
+                className="delete-confirm-cancel"
+                onClick={cancelDelete}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button 
+                className="delete-confirm-delete"
+                onClick={confirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

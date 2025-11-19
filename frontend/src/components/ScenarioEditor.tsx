@@ -356,8 +356,8 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
     } else if (effectAllowed === 'move') {
       // Drag from grid - only allow on eligible tiles (not barriers)
       if (tile.type !== 'barrier' && !tile.isDoor && !tile.isStanchion) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
       }
     }
   }, [grid]);
@@ -685,12 +685,12 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
       if (scenarioId && !isNaN(scenarioId)) {
         // Update existing scenario
         config = await trainConfigApi.update(scenarioId, {
-          name: name || undefined,
+        name: name || undefined,
           title: title || undefined,
-          height: grid.height,
-          width: grid.width,
-          tiles: grid.tiles,
-        });
+        height: grid.height,
+        width: grid.width,
+        tiles: grid.tiles,
+      });
       } else {
         // Create new scenario
         config = await trainConfigApi.create({
@@ -771,7 +771,7 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
       titleDebounceTimerRef.current = setTimeout(() => {
         debouncedUpdateTitle(newTitle);
       }, 500); // 500ms debounce
-    }
+                }
   };
 
   // Cleanup timer on unmount
@@ -798,12 +798,12 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
     <div className="scenario-editor">
       {/* Back button if coming from study detail */}
       {studyId && (
-        <button 
+            <button
           onClick={() => navigate(`/study-builder/${studyId}`)} 
           className="scenario-editor-back-button"
-        >
+            >
           ← Back to Study
-        </button>
+            </button>
       )}
       {/* <div className="scenario-editor-header">
         <h1>Scenario Editor</h1>
@@ -826,8 +826,8 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
               </div>
             )}
             <div className="scenario-title-header">
-              <input
-                type="text"
+          <input
+            type="text"
                 value={title}
                 onChange={handleTitleChange}
                 className="scenario-title-input"
@@ -835,7 +835,7 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
               />
               {savingTitle && <span className="saving-indicator">Saving...</span>}
             </div>
-          </div>
+        </div>
 
           {/* Temporary save banner */}
           {showSaveBanner && savedConfig && (
@@ -844,17 +844,17 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
                 <span className="save-success-message">
                   ✓ Scenario {savedConfig.id} saved!
                 </span>
-                <button
+          <button
                   className="close-banner-button"
                   onClick={() => setShowSaveBanner(false)}
                   aria-label="Close banner"
-                >
+          >
                   ×
-                </button>
-              </div>
-            </div>
-          )}
-          
+          </button>
+        </div>
+          </div>
+        )}
+
           {/* Permanent links for existing scenarios */}
           {savedConfig && (
             <div className="scenario-links-section">
@@ -892,8 +892,8 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
               >
                 {linkCopied ? 'Copied!' : 'Copy Link'}
               </button>
-            </div>
-          )}
+          </div>
+        )}
           <div className="tile-selector-header">
             <div className="tile-selector-label">Add:</div>
             <div className="tile-selector-tiles">

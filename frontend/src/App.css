@@ -101,6 +101,82 @@
   color: white;
 }
 
+/* Dropdown Styles */
+.nav-dropdown {
+  position: relative;
+}
+
+.nav-dropdown-toggle {
+  background: transparent;
+  border: none;
+  color: #d7dadc;
+  font-size: 1rem;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.nav-dropdown-toggle:hover {
+  background-color: #3a3a3c;
+  color: white;
+}
+
+.nav-dropdown-toggle.active {
+  background-color: #4a90e2;
+  color: white;
+}
+
+.nav-dropdown-icon {
+  font-size: 0.7rem;
+  transition: transform 0.2s;
+}
+
+.nav-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.5rem;
+  background-color: #121213;
+  border: 1px solid #3a3a3c;
+  border-radius: 4px;
+  min-width: 150px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.nav-dropdown-menu a {
+  display: block;
+  color: #d7dadc;
+  text-decoration: none;
+  font-size: 1rem;
+  padding: 0.75rem 1rem;
+  transition: all 0.2s;
+  border: none;
+  border-radius: 0;
+  width: 100%;
+  text-align: left;
+}
+
+.nav-dropdown-menu a:hover {
+  background-color: #3a3a3c;
+  color: white;
+}
+
+.nav-dropdown-menu a.active {
+  background-color: #4a90e2;
+  color: white;
+}
+
+.nav-dropdown-mobile {
+  display: none;
+}
+
 .nav-user-email {
   color: #d7dadc;
   font-size: 0.9rem;
@@ -156,6 +232,25 @@
   }
 
   .nav-links a {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    text-align: left;
+  }
+
+  /* Hide desktop dropdown on mobile */
+  .nav-dropdown {
+    display: none;
+  }
+
+  /* Show mobile dropdown items */
+  .nav-dropdown-mobile {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 0;
+  }
+
+  .nav-dropdown-mobile a {
     width: 100%;
     padding: 0.75rem 1rem;
     text-align: left;
@@ -232,9 +327,11 @@
   color: #d7dadc;
   border: 1px solid #565658;
   border-radius: 4px;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.2s ease;
+  height: fit-content;
+  line-height: 1.2;
 }
 
 .gender-dropdown:hover {

@@ -17,6 +17,8 @@ export default function StudyDetail() {
   const [description, setDescription] = useState<string>('')
   const [saving, setSaving] = useState<boolean>(false)
   const [creatingScenario, setCreatingScenario] = useState<boolean>(false)
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<{ id: number; name: string } | null>(null)
+  const [deleting, setDeleting] = useState<boolean>(false)
   const titleDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const descriptionDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -81,6 +83,48 @@ export default function StudyDetail() {
     }
 
     return tiles
+  }
+
+  // Handle deleting a scenario
+  const handleDeleteScenario = async (itemId: number, scenarioName: string) => {
+    if (!study || !study.scenario_group) return
+    
+    setDeleteConfirmItem({ id: itemId, name: scenarioName })
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmItem || !study || !study.scenario_group) return
+
+    setDeleting(true)
+    setError(null)
+
+    try {
+      await scenarioGroupApi.deleteItem(study.scenario_group.id, deleteConfirmItem.id)
+      
+      // Refresh study data
+      if (id) {
+        try {
+          const studyId = parseInt(id, 10)
+          if (!isNaN(studyId)) {
+            const updatedStudy = await studyApi.getById(studyId)
+            setStudy(updatedStudy)
+          }
+        } catch (err) {
+          console.error('Failed to refresh study data:', err)
+          setError(err instanceof Error ? err.message : 'Failed to refresh study')
+        }
+      }
+      
+      setDeleteConfirmItem(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete scenario')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const cancelDelete = () => {
+    setDeleteConfirmItem(null)
   }
 
   // Handle creating a new scenario
@@ -323,14 +367,25 @@ export default function StudyDetail() {
               {study.scenario_group.items?.map((item: any) => {
                 const scenario = item.train_configuration
                 if (!scenario) return null
+                const scenarioName = scenario.name || `Scenario ${scenario.id}`
                 return (
                   <div 
                     key={item.id} 
                     className="scenario-card"
                     onClick={() => navigate(`/scenario-editor/${scenario.id}?studyId=${study.id}`)}
                   >
+                    <button
+                      className="scenario-card-delete"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteScenario(item.id, scenarioName)
+                      }}
+                      aria-label="Delete scenario"
+                    >
+                      ×
+                    </button>
                     <div className="scenario-card-content">
-                      <h3>{scenario.name || `Scenario ${scenario.id}`}</h3>
+                      <h3>{scenarioName}</h3>
                       <p className="scenario-card-info">
                         {scenario.height} × {scenario.width} grid
                       </p>
@@ -342,6 +397,31 @@ export default function StudyDetail() {
           </div>
         )}
       </div>
+      {/* Delete Confirmation Dialog */}
+      {deleteConfirmItem && (
+        <div className="delete-confirm-overlay" onClick={cancelDelete}>
+          <div className="delete-confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete Scenario?</h3>
+            <p>Are you sure you want to delete "{deleteConfirmItem.name}"? This action cannot be undone.</p>
+            <div className="delete-confirm-buttons">
+              <button 
+                className="delete-confirm-cancel"
+                onClick={cancelDelete}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button 
+                className="delete-confirm-delete"
+                onClick={confirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

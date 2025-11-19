@@ -43,7 +43,7 @@ class UserResponseCreate(BaseModel):
     selection_type: Literal["seat", "floor"] = Field(..., description="Type of selection: 'seat' or 'floor'")
     user_session_id: Optional[str] = Field(None, description="Optional session identifier")
     user_id: Optional[str] = Field(None, description="Optional user identifier")
-    gender: Optional[Literal["man", "woman", "neutral"]] = Field(None, description="User gender: 'man', 'woman', or 'neutral'")
+    gender: Optional[Literal["man", "woman", "neutral", "prefer-not-to-say"]] = Field(None, description="User gender: 'man', 'woman', 'neutral', or 'prefer-not-to-say'")
 
 
 class UserResponseResponse(BaseModel):

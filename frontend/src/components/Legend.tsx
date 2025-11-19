@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { EMOJI_MAN, EMOJI_WOMAN, EMOJI_NEUTRAL } from '../constants/emojis'
+import { EMOJI_MAN, EMOJI_WOMAN, EMOJI_NEUTRAL, EMOJI_BLANK } from '../constants/emojis'
 import { PlayerGender } from '../App'
 
 interface LegendProps {
@@ -22,23 +22,21 @@ export default function Legend({ playerGender, onGenderChange }: LegendProps) {
           <span className="legend-toggle-label">Legend</span>
           <span className="legend-toggle-icon">{legendExpanded ? '▼' : '▶'}</span>
         </button>
+        <select
+          id="gender-select"
+          value={playerGender}
+          onChange={(e) => onGenderChange(e.target.value as PlayerGender)}
+          className="gender-dropdown"
+        >
+          <option value="prefer-not-to-say">{EMOJI_BLANK} Prefer not to say</option>
+          <option value="man">{EMOJI_MAN} Man</option>
+          <option value="woman">{EMOJI_WOMAN} Woman</option>
+          <option value="neutral">{EMOJI_NEUTRAL} Gender Neutral</option>
+        </select>
       </div>
       <div className="legend-container">
         {legendExpanded && (
           <div className="legend">
-            <div className="legend-item">
-              <span className="legend-label">You:</span>
-              <select
-                id="gender-select"
-                value={playerGender}
-                onChange={(e) => onGenderChange(e.target.value as PlayerGender)}
-                className="gender-dropdown"
-              >
-                <option value="man">{EMOJI_MAN} Man</option>
-                <option value="woman">{EMOJI_WOMAN} Woman</option>
-                <option value="neutral">{EMOJI_NEUTRAL} Gender Neutral</option>
-              </select>
-            </div>
             <div className="legend-item">
               <div className="legend-tile tile-legend-eligible-seat"></div>
               <span className="legend-label">Available Seat</span>

@@ -16,6 +16,9 @@
   cursor: pointer;
   transition: all 0.2s;
   margin-bottom: 1.5rem;
+  display: block;
+  margin-left: 0;
+  margin-right: auto;
 }
 
 .scenario-editor-back-button:hover {

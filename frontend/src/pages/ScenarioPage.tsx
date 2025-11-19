@@ -12,7 +12,7 @@ export default function ScenarioPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [playerGender, setPlayerGender] = useState<PlayerGender>('neutral')
+  const [playerGender, setPlayerGender] = useState<PlayerGender>('prefer-not-to-say')
   const [selectedTile, setSelectedTile] = useState<{ row: number; col: number } | null>(null)
   const [selectionType, setSelectionType] = useState<'train' | 'platform' | null>(null)
   const [grid, setGrid] = useState<SubwayGrid | null>(null)
@@ -40,6 +40,13 @@ export default function ScenarioPage() {
   // Check URL for results parameter
   const showResults = searchParams.get('results') === 'true'
 
+  // Scroll to top when navigating to results page
+  useEffect(() => {
+    if (showResults) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [showResults])
+
   // Load statistics when results parameter is present
   useEffect(() => {
     const loadStatistics = async () => {
@@ -61,20 +68,20 @@ export default function ScenarioPage() {
   useEffect(() => {
     if (!id && !showResults && !grid) {
       // Load a random scenario immediately
-      const loadRandomScenario = async () => {
-        try {
+        const loadRandomScenario = async () => {
+          try {
           setLoading(true)
           console.log('Loading random scenario...')
-          const config = await trainConfigApi.getRandom()
+            const config = await trainConfigApi.getRandom()
           
           // Clear any existing selection state first
           setSelectedTile(null)
           setSelectionType(null)
           
-          const subwayGrid = new SubwayGrid(config.height, config.width, config.tiles)
-          setGrid(subwayGrid)
-          setScenarioId(config.id)
-          setScenarioName(config.name || null)
+            const subwayGrid = new SubwayGrid(config.height, config.width, config.tiles)
+            setGrid(subwayGrid)
+            setScenarioId(config.id)
+            setScenarioName(config.name || null)
           setScenarioTitle(config.title || null)
           console.log('Random scenario loaded with ID:', config.id, 'Name:', config.name, 'Title:', config.title)
           
@@ -88,25 +95,25 @@ export default function ScenarioPage() {
             setHasPreviousResponse(false)
             // Don't block scenario loading if this fails
           }
-          
-          // Update URL to include scenario ID
-          navigate(`/scenario/${config.id}`, { replace: true })
-          
-          setTrainArrived(true)
+            
+            // Update URL to include scenario ID
+            navigate(`/scenario/${config.id}`, { replace: true })
+            
+            setTrainArrived(true)
           setIsTrainActive(true)
-          setGridAnimation('slidingIn')
-          setTimeout(() => {
-            setGridAnimation('idle')
-          }, 600)
-          setLoading(false)
-        } catch (err) {
-          console.error('Failed to load random scenario:', err)
-          setError(err instanceof Error ? err.message : 'Failed to load scenario')
-          setLoading(false)
+            setGridAnimation('slidingIn')
+            setTimeout(() => {
+              setGridAnimation('idle')
+            }, 600)
+            setLoading(false)
+          } catch (err) {
+            console.error('Failed to load random scenario:', err)
+            setError(err instanceof Error ? err.message : 'Failed to load scenario')
+            setLoading(false)
+          }
         }
+        loadRandomScenario()
       }
-      loadRandomScenario()
-    }
   }, [id, showResults, grid, navigate])
 
   // Load scenario on mount (when ID is provided)
@@ -385,7 +392,7 @@ export default function ScenarioPage() {
           ) : grid ? (
             <>
               {scenarioTitle && <h1 className="scenario-title">{scenarioTitle}</h1>}
-              <h1 className="main-header-prompt">Your train is here! Where will you sit (or stand)?</h1>
+              <h1 className="main-header-prompt">Your train is here! Where will you sit or stand?</h1>
             </>
           ) : loading || !grid ? (
             <>
@@ -424,7 +431,7 @@ export default function ScenarioPage() {
           />
         )}
       </main>
-      <footer className="App-footer">
+    <footer className="App-footer">
         {showResults ? (
           <button 
             className="continue-button" 

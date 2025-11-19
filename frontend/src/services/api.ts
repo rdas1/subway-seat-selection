@@ -41,7 +41,7 @@ export interface UserResponseCreate {
   selection_type: 'seat' | 'floor';
   user_session_id?: string;
   user_id?: string;
-  gender?: 'man' | 'woman' | 'neutral';
+  gender?: 'man' | 'woman' | 'neutral' | 'prefer-not-to-say';
 }
 
 export interface UserResponseResponse {
@@ -107,7 +107,7 @@ export const trainConfigApi = {
     return response.json();
   },
 
-  async getStatistics(id: number, gender?: 'man' | 'woman' | 'neutral') {
+  async getStatistics(id: number, gender?: 'man' | 'woman' | 'neutral' | 'prefer-not-to-say') {
     const params = new URLSearchParams();
     if (gender) {
       params.append('gender', gender);
@@ -370,6 +370,17 @@ export const scenarioGroupApi = {
     }
 
     return response.json();
+  },
+
+  async deleteItem(groupId: number, itemId: number): Promise<void> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/scenario-groups/${groupId}/items/${itemId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to delete item from scenario group' }));
+      throw new Error(error.detail || 'Failed to delete item from scenario group');
+    }
   },
 };
 

@@ -2,6 +2,7 @@
 export const EMOJI_MAN = '👨';
 export const EMOJI_WOMAN = '👩';
 export const EMOJI_NEUTRAL = '🧑';
+export const EMOJI_BLANK = '👤';
 
 // Emoji constants for occupied seats (from grid data)
 export const EMOJI_CHILD = '👶';
@@ -17,8 +18,10 @@ export const getPlayerEmoji = (gender: PlayerGender): string => {
       return EMOJI_WOMAN;
     case 'neutral':
       return EMOJI_NEUTRAL;
+    case 'prefer-not-to-say':
+      return EMOJI_BLANK;
     default:
-      return EMOJI_NEUTRAL;
+      return EMOJI_BLANK;
   }
 };
 
