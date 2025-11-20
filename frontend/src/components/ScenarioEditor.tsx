@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { SubwayGrid } from '../classes/SubwayGrid';
 import { Tile } from '../types/grid';
-import { trainConfigApi, TrainConfigurationResponse } from '../services/api';
+import { trainConfigApi, TrainConfigurationResponse, PostResponseQuestionResponse, PostResponseQuestionCreate, questionApi, TagLibraryResponse, QuestionTagResponse } from '../services/api';
 import { formatRelativeTime } from '../utils/time';
 import Grid from './Grid';
 import './ScenarioEditor.css';
@@ -33,6 +33,12 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
   const [gridHeight, setGridHeight] = useState<number>(20);
   const [gridWidth, setGridWidth] = useState<number>(5);
   const titleDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [questions, setQuestions] = useState<PostResponseQuestionResponse[]>([]);
+  const [loadingQuestions, setLoadingQuestions] = useState<boolean>(false);
+  const [editingQuestion, setEditingQuestion] = useState<PostResponseQuestionResponse | null>(null);
+  const [showTagLibrary, setShowTagLibrary] = useState<boolean>(false);
+  const [tagLibrary, setTagLibrary] = useState<TagLibraryResponse | null>(null);
+  const [isInStudy, setIsInStudy] = useState<boolean>(false);
 
   // Initialize grid with sample pattern if dimensions match, otherwise empty
   const initializeGrid = useCallback((height: number, width: number) => {
@@ -774,6 +780,104 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
                 }
   };
 
+  // Question management handlers
+  const handleCreateQuestion = async () => {
+    if (!savedConfig?.id) return;
+    
+    const newQuestion: PostResponseQuestionCreate = {
+      question_text: '',
+      is_required: false,
+      free_text_required: false,
+      allows_free_text: true,
+      allows_tags: true,
+      order: questions.length,
+      tag_ids: []
+    };
+    
+    try {
+      const created = await trainConfigApi.createQuestion(savedConfig.id, newQuestion);
+      setQuestions([...questions, created]);
+      setEditingQuestion(created);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create question');
+    }
+  };
+
+  const handleUpdateQuestion = async (questionId: number, updates: Partial<PostResponseQuestionCreate>) => {
+    if (!savedConfig?.id) return;
+    
+    const question = questions.find(q => q.id === questionId);
+    if (!question) return;
+    
+    const updateData: PostResponseQuestionCreate = {
+      question_text: question.is_default ? undefined : (updates.question_text ?? question.question.question_text),
+      is_required: updates.is_required ?? question.is_required,
+      free_text_required: updates.free_text_required ?? question.free_text_required,
+      allows_free_text: updates.allows_free_text ?? question.question.allows_free_text,
+      allows_tags: updates.allows_tags ?? question.question.allows_tags,
+      order: updates.order ?? question.order,
+      tag_ids: updates.tag_ids ?? question.tags.map(t => t.id)
+    };
+    
+    try {
+      const updated = await trainConfigApi.updateQuestion(savedConfig.id, questionId, updateData);
+      setQuestions(questions.map(q => q.id === questionId ? updated : q));
+      setEditingQuestion(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update question');
+    }
+  };
+
+  const handleDeleteQuestion = async (questionId: number) => {
+    if (!savedConfig?.id) return;
+    
+    try {
+      await trainConfigApi.deleteQuestion(savedConfig.id, questionId);
+      setQuestions(questions.filter(q => q.id !== questionId));
+      if (editingQuestion?.id === questionId) {
+        setEditingQuestion(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete question');
+    }
+  };
+
+  const handleAddTagsToQuestion = async (questionId: number, selectedTagIds: number[]) => {
+    if (!savedConfig?.id) return;
+    
+    const question = questions.find(q => q.id === questionId);
+    if (!question) return;
+    
+    const currentTagIds = question.tags.map(t => t.id);
+    const newTagIds = [...new Set([...currentTagIds, ...selectedTagIds])];
+    
+    await handleUpdateQuestion(questionId, { tag_ids: newTagIds });
+    setShowTagLibrary(false);
+  };
+
+  const handleRemoveTagFromQuestion = async (questionId: number, tagId: number) => {
+    if (!savedConfig?.id) return;
+    
+    const question = questions.find(q => q.id === questionId);
+    if (!question) return;
+    
+    const newTagIds = question.tags.filter(t => t.id !== tagId).map(t => t.id);
+    await handleUpdateQuestion(questionId, { tag_ids: newTagIds });
+  };
+
+  const handleCreateNewTag = async (tagText: string) => {
+    try {
+      const newTag = await questionApi.createTag({ tag_text: tagText });
+      // Refresh tag library
+      const library = await questionApi.getTagLibrary();
+      setTagLibrary(library);
+      return newTag;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create tag');
+      throw err;
+    }
+  };
+
   // Cleanup timer on unmount
   useEffect(() => {
     return () => {
@@ -793,6 +897,46 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, initialGrid]);
+
+  // Load questions when scenario is saved/loaded
+  useEffect(() => {
+    if (savedConfig?.id) {
+      const loadQuestions = async () => {
+        setLoadingQuestions(true);
+        try {
+          const questionsData = await trainConfigApi.getQuestions(savedConfig.id);
+          setQuestions(questionsData);
+        } catch (err) {
+          console.error('Failed to load questions:', err);
+        } finally {
+          setLoadingQuestions(false);
+        }
+      };
+      loadQuestions();
+    } else {
+      setQuestions([]);
+    }
+  }, [savedConfig?.id]);
+
+  // Check if scenario is in a study
+  useEffect(() => {
+    setIsInStudy(!!studyId);
+  }, [studyId]);
+
+  // Load tag library when needed
+  useEffect(() => {
+    if (showTagLibrary && !tagLibrary) {
+      const loadTagLibrary = async () => {
+        try {
+          const library = await questionApi.getTagLibrary();
+          setTagLibrary(library);
+        } catch (err) {
+          console.error('Failed to load tag library:', err);
+        }
+      };
+      loadTagLibrary();
+    }
+  }, [showTagLibrary, tagLibrary]);
 
   return (
     <div className="scenario-editor">
@@ -1069,6 +1213,369 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
           <p>Set grid dimensions above and click outside the inputs to create a grid.</p>
         </div>
       )}
+
+      {/* Questions Management Section */}
+      {savedConfig?.id && (
+        <div className="questions-section">
+          <h2 className="questions-section-title">Post-Response Questions</h2>
+          {loadingQuestions ? (
+            <p>Loading questions...</p>
+          ) : (
+            <>
+              <div className="questions-list">
+                {questions.map((question) => (
+                  <div key={question.id} className="question-card">
+                    <div className="question-card-header">
+                      <h3>{question.question.question_text}</h3>
+                      {question.is_default && <span className="default-badge">Default</span>}
+                      {question.is_required && <span className="required-badge">Required</span>}
+                    </div>
+                    <div className="question-card-content">
+                      <div className="question-options">
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={question.question.allows_free_text}
+                            onChange={(e) => handleUpdateQuestion(question.id, { allows_free_text: e.target.checked })}
+                            disabled={question.is_default}
+                          />
+                          Allow free text
+                        </label>
+                        {isInStudy && question.question.allows_free_text && (
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={question.free_text_required}
+                              onChange={(e) => handleUpdateQuestion(question.id, { free_text_required: e.target.checked })}
+                            />
+                            Require free text
+                          </label>
+                        )}
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={question.question.allows_tags}
+                            onChange={(e) => handleUpdateQuestion(question.id, { allows_tags: e.target.checked })}
+                            disabled={question.is_default}
+                          />
+                          Allow tags
+                        </label>
+                        {isInStudy && (
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={question.is_required}
+                              onChange={(e) => handleUpdateQuestion(question.id, { is_required: e.target.checked })}
+                            />
+                            Required question
+                          </label>
+                        )}
+                      </div>
+                      {question.question.allows_tags && (
+                        <div className="question-tags">
+                          <div className="tags-list">
+                            {question.tags.map((tag) => (
+                              <span key={tag.id} className="tag-badge">
+                                {tag.tag_text}
+                                <button
+                                  onClick={() => handleRemoveTagFromQuestion(question.id, tag.id)}
+                                  className="tag-remove"
+                                  aria-label="Remove tag"
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                          <button
+                            onClick={() => {
+                              setEditingQuestion(question);
+                              setShowTagLibrary(true);
+                            }}
+                            className="add-tags-button"
+                          >
+                            Add Tags
+                          </button>
+                        </div>
+                      )}
+                      {!question.is_default && (
+                        <div className="question-actions">
+                          <button
+                            onClick={() => setEditingQuestion(question)}
+                            className="edit-question-button"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteQuestion(question.id)}
+                            className="delete-question-button"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={handleCreateQuestion}
+                className="create-question-button"
+              >
+                + Add Question
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Tag Library Modal */}
+      {showTagLibrary && editingQuestion && tagLibrary && (
+        <div className="tag-library-overlay" onClick={() => setShowTagLibrary(false)}>
+          <div className="tag-library-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="tag-library-header">
+              <h3>Add Tags</h3>
+              <button onClick={() => setShowTagLibrary(false)} className="close-modal">×</button>
+            </div>
+            <TagLibraryModal
+              library={tagLibrary}
+              currentTagIds={editingQuestion.tags.map(t => t.id)}
+              onSelectTags={(tagIds) => handleAddTagsToQuestion(editingQuestion.id, tagIds)}
+              onCreateTag={handleCreateNewTag}
+              onClose={() => setShowTagLibrary(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Question Editor Modal */}
+      {editingQuestion && !showTagLibrary && (
+        <div className="question-editor-overlay" onClick={() => setEditingQuestion(null)}>
+          <div className="question-editor-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="question-editor-header">
+              <h3>Edit Question</h3>
+              <button onClick={() => setEditingQuestion(null)} className="close-modal">×</button>
+            </div>
+            <QuestionEditor
+              question={editingQuestion}
+              isInStudy={isInStudy}
+              onSave={(updates) => handleUpdateQuestion(editingQuestion.id, updates)}
+              onCancel={() => setEditingQuestion(null)}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Tag Library Modal Component
+function TagLibraryModal({ 
+  library, 
+  currentTagIds, 
+  onSelectTags, 
+  onCreateTag,
+  onClose 
+}: { 
+  library: TagLibraryResponse;
+  currentTagIds: number[];
+  onSelectTags: (tagIds: number[]) => void;
+  onCreateTag: (tagText: string) => Promise<QuestionTagResponse>;
+  onClose: () => void;
+}) {
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<number>>(new Set(currentTagIds));
+  const [newTagText, setNewTagText] = useState('');
+  const [creatingTag, setCreatingTag] = useState(false);
+
+  const toggleTag = (tagId: number) => {
+    const newSet = new Set(selectedTagIds);
+    if (newSet.has(tagId)) {
+      newSet.delete(tagId);
+    } else {
+      newSet.add(tagId);
+    }
+    setSelectedTagIds(newSet);
+  };
+
+  const handleCreateTag = async () => {
+    if (!newTagText.trim()) return;
+    setCreatingTag(true);
+    try {
+      const newTag = await onCreateTag(newTagText.trim());
+      setSelectedTagIds(new Set([...selectedTagIds, newTag.id]));
+      setNewTagText('');
+      // Refresh library will be handled by parent
+    } catch (err) {
+      // Error handled by parent
+    } finally {
+      setCreatingTag(false);
+    }
+  };
+
+  const handleAddSelected = () => {
+    onSelectTags(Array.from(selectedTagIds));
+  };
+
+  return (
+    <div className="tag-library-content">
+      <div className="tag-library-sections">
+        <div className="tag-section">
+          <h4>Default Tags</h4>
+          <div className="tags-grid">
+            {library.default_tags.map((tag) => (
+              <label key={tag.id} className="tag-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedTagIds.has(tag.id)}
+                  onChange={() => toggleTag(tag.id)}
+                />
+                <span>{tag.tag_text}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="tag-section">
+          <h4>Your Tags</h4>
+          <div className="tags-grid">
+            {library.your_tags.map((tag) => (
+              <label key={tag.id} className="tag-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedTagIds.has(tag.id)}
+                  onChange={() => toggleTag(tag.id)}
+                />
+                <span>{tag.tag_text}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="tag-section">
+          <h4>Community Tags</h4>
+          <div className="tags-grid">
+            {library.community_tags.map((tag) => (
+              <label key={tag.id} className="tag-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedTagIds.has(tag.id)}
+                  onChange={() => toggleTag(tag.id)}
+                />
+                <span>{tag.tag_text}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="create-tag-section">
+        <input
+          type="text"
+          value={newTagText}
+          onChange={(e) => setNewTagText(e.target.value)}
+          placeholder="Create new tag..."
+          onKeyPress={(e) => e.key === 'Enter' && handleCreateTag()}
+        />
+        <button onClick={handleCreateTag} disabled={!newTagText.trim() || creatingTag}>
+          {creatingTag ? 'Creating...' : 'Create Tag'}
+        </button>
+      </div>
+      <div className="tag-library-actions">
+        <button onClick={onClose} className="cancel-button">Cancel</button>
+        <button onClick={handleAddSelected} className="add-button">Add Selected Tags</button>
+      </div>
+    </div>
+  );
+}
+
+// Question Editor Component
+function QuestionEditor({
+  question,
+  isInStudy,
+  onSave,
+  onCancel
+}: {
+  question: PostResponseQuestionResponse;
+  isInStudy: boolean;
+  onSave: (updates: Partial<PostResponseQuestionCreate>) => void;
+  onCancel: () => void;
+}) {
+  const [questionText, setQuestionText] = useState(question.question.question_text);
+  const [isRequired, setIsRequired] = useState(question.is_required);
+  const [freeTextRequired, setFreeTextRequired] = useState(question.free_text_required);
+  const [allowsFreeText, setAllowsFreeText] = useState(question.question.allows_free_text);
+  const [allowsTags, setAllowsTags] = useState(question.question.allows_tags);
+
+  const handleSave = () => {
+    onSave({
+      question_text: question.is_default ? undefined : questionText,
+      is_required: isRequired,
+      free_text_required: freeTextRequired,
+      allows_free_text: allowsFreeText,
+      allows_tags: allowsTags
+    });
+  };
+
+  return (
+    <div className="question-editor-content">
+      <div className="form-group">
+        <label>Question Text</label>
+        <input
+          type="text"
+          value={questionText}
+          onChange={(e) => setQuestionText(e.target.value)}
+          disabled={question.is_default}
+          placeholder="Enter question text"
+        />
+        {question.is_default && <p className="help-text">Default question text cannot be edited</p>}
+      </div>
+      <div className="form-group">
+        <label>
+          <input
+            type="checkbox"
+            checked={allowsFreeText}
+            onChange={(e) => setAllowsFreeText(e.target.checked)}
+            disabled={question.is_default}
+          />
+          Allow free text response
+        </label>
+      </div>
+      {isInStudy && allowsFreeText && (
+        <div className="form-group">
+          <label>
+            <input
+              type="checkbox"
+              checked={freeTextRequired}
+              onChange={(e) => setFreeTextRequired(e.target.checked)}
+            />
+            Require free text response
+          </label>
+        </div>
+      )}
+      <div className="form-group">
+        <label>
+          <input
+            type="checkbox"
+            checked={allowsTags}
+            onChange={(e) => setAllowsTags(e.target.checked)}
+            disabled={question.is_default}
+          />
+          Allow tag selection
+        </label>
+      </div>
+      {isInStudy && (
+        <div className="form-group">
+          <label>
+            <input
+              type="checkbox"
+              checked={isRequired}
+              onChange={(e) => setIsRequired(e.target.checked)}
+            />
+            Required question
+          </label>
+        </div>
+      )}
+      <div className="question-editor-actions">
+        <button onClick={onCancel} className="cancel-button">Cancel</button>
+        <button onClick={handleSave} className="save-button">Save</button>
+      </div>
     </div>
   );
 }

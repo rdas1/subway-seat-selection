@@ -63,6 +63,27 @@ Test the database connection:
 curl http://localhost:8000/db-test
 ```
 
+### Backpopulate Default Questions
+
+To add the default question "Why did you choose this spot?" to all existing scenarios, run:
+
+```bash
+python backpopulate_default_questions.py
+```
+
+Or if using Python 3 explicitly:
+
+```bash
+python3 backpopulate_default_questions.py
+```
+
+This is a one-time operation that will:
+- Find or create the default question
+- Add it to all scenarios that don't already have it
+- Skip scenarios that already have the default question
+
+**Note:** Make sure your database is running and the `DATABASE_URL` environment variable is set correctly before running this script.
+
 ## API Endpoints
 
 ### Train Configurations

@@ -173,3 +173,96 @@ class StudyResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+# Question Schemas
+class QuestionCreate(BaseModel):
+    question_text: str = Field(..., description="The question text")
+    allows_free_text: bool = Field(True, description="Whether the question allows free text responses")
+    allows_tags: bool = Field(True, description="Whether the question allows tag selection")
+
+
+class QuestionResponse(BaseModel):
+    id: int
+    question_text: str
+    allows_free_text: bool
+    allows_tags: bool
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+class PostResponseQuestionCreate(BaseModel):
+    question_id: Optional[int] = Field(None, description="ID of existing question to link, or None to create new")
+    question_text: Optional[str] = Field(None, description="Question text (required if question_id not provided)")
+    is_required: bool = Field(False, description="Whether the question is required (only valid if scenario is in a study)")
+    free_text_required: bool = Field(False, description="Whether free text is required (only valid if scenario is in a study)")
+    allows_free_text: bool = Field(True, description="Whether the question allows free text (only used when creating new Question)")
+    allows_tags: bool = Field(True, description="Whether the question allows tags (only used when creating new Question)")
+    order: int = Field(0, description="Order position for the question")
+    tag_ids: Optional[List[int]] = Field(default=[], description="List of tag IDs to assign to the question")
+
+
+class QuestionTagCreate(BaseModel):
+    tag_text: str = Field(..., description="The tag text (must be unique)")
+    is_default: bool = Field(False, description="Whether this is a default tag (only settable by admin)")
+
+
+class QuestionTagResponse(BaseModel):
+    id: int
+    tag_text: str
+    is_default: bool
+    created_by_user_id: Optional[int]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PostResponseQuestionResponse(BaseModel):
+    id: int
+    question_id: int
+    train_configuration_id: int
+    is_required: bool
+    free_text_required: bool
+    order: int
+    is_default: bool
+    created_at: datetime
+    updated_at: Optional[datetime]
+    question: QuestionResponse
+    tags: List[QuestionTagResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+class QuestionResponseCreate(BaseModel):
+    post_response_question_id: int = Field(..., description="ID of the post-response question")
+    free_text_response: Optional[str] = Field(None, description="Free text response (required if question.free_text_required=True)")
+    selected_tag_ids: Optional[List[int]] = Field(default=[], description="List of selected tag IDs (always optional)")
+
+
+class QuestionResponseResponse(BaseModel):
+    id: int
+    user_response_id: int
+    post_response_question_id: int
+    free_text_response: Optional[str]
+    created_at: datetime
+    selected_tags: List[QuestionTagResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+class TagStatisticsResponse(BaseModel):
+    tag_id: int
+    tag_text: str
+    selection_count: int
+
+
+class TagLibraryResponse(BaseModel):
+    default_tags: List[QuestionTagResponse] = []
+    your_tags: List[QuestionTagResponse] = []
+    community_tags: List[QuestionTagResponse] = []
+

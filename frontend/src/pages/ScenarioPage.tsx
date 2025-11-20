@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import SeatSelectionApp from '../components/SeatSelectionApp'
 import StatisticsView from '../components/StatisticsView'
 import Legend from '../components/Legend'
 import { SubwayGrid } from '../classes/SubwayGrid'
 import { PlayerGender } from '../App'
-import { trainConfigApi, userResponseApi } from '../services/api'
+import { trainConfigApi, userResponseApi, QuestionResponseCreate } from '../services/api'
 import { getSessionId } from '../utils/session'
 
 export default function ScenarioPage() {
@@ -36,6 +36,9 @@ export default function ScenarioPage() {
   } | null>(null)
   const [userSelection, setUserSelection] = useState<{ row: number; col: number } | null>(null)
   const [hasPreviousResponse, setHasPreviousResponse] = useState<boolean>(false)
+  const [userResponseId, setUserResponseId] = useState<number | null>(null)
+  const [questionResponses, setQuestionResponses] = useState<QuestionResponseCreate[]>([])
+  const [canProceedToNext, setCanProceedToNext] = useState<boolean>(true)
 
   // Check URL for results parameter
   const showResults = searchParams.get('results') === 'true'
@@ -230,8 +233,9 @@ export default function ScenarioPage() {
           console.log('POST request successful:', response)
           console.log('Response saved to database with ID:', response.id)
           
-          // Store user's selection before navigating to results
+          // Store user's selection and response ID before navigating to results
           setUserSelection({ row: selectedTile.row, col: selectedTile.col })
+          setUserResponseId(response.id)
           setHasPreviousResponse(true)
           
           // Fetch statistics and navigate to results
@@ -317,12 +321,35 @@ export default function ScenarioPage() {
     console.log('Waiting for next train')
   }
 
-  const handleNextScenario = () => {
+  const handleQuestionResponsesChange = useCallback((responses: QuestionResponseCreate[]) => {
+    setQuestionResponses(responses)
+  }, [])
+
+  const handleValidationChange = useCallback((isValid: boolean) => {
+    setCanProceedToNext(isValid)
+  }, [])
+
+  const handleNextScenario = async () => {
+    // Submit question responses if we have a user response ID and question responses
+    if (userResponseId && questionResponses.length > 0) {
+      try {
+        await userResponseApi.submitQuestionResponses(userResponseId, questionResponses)
+        console.log('Question responses submitted successfully')
+      } catch (err) {
+        console.error('Failed to submit question responses:', err)
+        setError(err instanceof Error ? err.message : 'Failed to submit question responses')
+        return // Don't proceed if submission failed
+      }
+    }
+    
     // Clear results from URL and state
     setStatistics(null)
     setSubmitSuccess(false)
     setError(null)
     setSelectedTile(null)
+    setUserResponseId(null)
+    setQuestionResponses([])
+    setCanProceedToNext(true)
     
     // Store grid state before clearing
     const hadGrid = !!grid
@@ -413,6 +440,9 @@ export default function ScenarioPage() {
             statistics={statistics}
             onStatisticsUpdate={setStatistics}
             userSelection={userSelection}
+            userResponseId={userResponseId || undefined}
+            onQuestionResponsesChange={handleQuestionResponsesChange}
+            onValidationChange={handleValidationChange}
           />
         ) : showResults ? (
           <div className="loading-message">
@@ -436,6 +466,8 @@ export default function ScenarioPage() {
           <button 
             className="continue-button" 
             onClick={handleNextScenario}
+            disabled={!canProceedToNext}
+            title={!canProceedToNext ? 'Please answer all required questions' : ''}
           >
             Next Scenario
           </button>

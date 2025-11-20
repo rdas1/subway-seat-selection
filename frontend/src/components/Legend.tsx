@@ -22,18 +22,18 @@ export default function Legend({ playerGender, onGenderChange }: LegendProps) {
           <span className="legend-toggle-label">Legend</span>
           <span className="legend-toggle-icon">{legendExpanded ? '▼' : '▶'}</span>
         </button>
-        <select
-          id="gender-select"
-          value={playerGender}
-          onChange={(e) => onGenderChange(e.target.value as PlayerGender)}
-          className="gender-dropdown"
-        >
+              <select
+                id="gender-select"
+                value={playerGender}
+                onChange={(e) => onGenderChange(e.target.value as PlayerGender)}
+                className="gender-dropdown"
+              >
           <option value="prefer-not-to-say">{EMOJI_BLANK} Prefer not to say</option>
-          <option value="man">{EMOJI_MAN} Man</option>
-          <option value="woman">{EMOJI_WOMAN} Woman</option>
-          <option value="neutral">{EMOJI_NEUTRAL} Gender Neutral</option>
-        </select>
-      </div>
+                <option value="man">{EMOJI_MAN} Man</option>
+                <option value="woman">{EMOJI_WOMAN} Woman</option>
+                <option value="neutral">{EMOJI_NEUTRAL} Gender Neutral</option>
+              </select>
+            </div>
       <div className="legend-container">
         {legendExpanded && (
           <div className="legend">

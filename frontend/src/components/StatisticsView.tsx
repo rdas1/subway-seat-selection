@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { SubwayGrid } from '../classes/SubwayGrid'
-import { trainConfigApi } from '../services/api'
+import { trainConfigApi, PostResponseQuestionResponse, QuestionResponseCreate, QuestionTagResponse } from '../services/api'
 import { EMOJI_MAN, EMOJI_WOMAN, EMOJI_NEUTRAL } from '../constants/emojis'
 import Grid from './Grid'
 import './StatisticsView.css'
@@ -18,11 +18,17 @@ interface StatisticsViewProps {
   }
   onStatisticsUpdate: (stats: StatisticsViewProps['statistics']) => void
   userSelection?: { row: number; col: number } | null
+  userResponseId?: number
+  onQuestionResponsesChange?: (responses: QuestionResponseCreate[]) => void
+  onValidationChange?: (isValid: boolean) => void
 }
 
-export default function StatisticsView({ grid, scenarioId, statistics, onStatisticsUpdate, userSelection }: StatisticsViewProps) {
+export default function StatisticsView({ grid, scenarioId, statistics, onStatisticsUpdate, userSelection, userResponseId, onQuestionResponsesChange, onValidationChange }: StatisticsViewProps) {
   const [selectedGender, setSelectedGender] = useState<'man' | 'woman' | 'neutral' | 'all'>('all')
   const [loading, setLoading] = useState(false)
+  const [questions, setQuestions] = useState<PostResponseQuestionResponse[]>([])
+  const [loadingQuestions, setLoadingQuestions] = useState(false)
+  const [questionResponses, setQuestionResponses] = useState<Map<number, { freeText: string; selectedTagIds: number[] }>>(new Map())
   const [tooltip, setTooltip] = useState<{
     row: number
     col: number
@@ -93,6 +99,63 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
       console.error('Failed to fetch gender breakdown:', err)
     }
   }
+
+  // Load questions for the scenario
+  useEffect(() => {
+    const loadQuestions = async () => {
+      setLoadingQuestions(true)
+      try {
+        const questionsData = await trainConfigApi.getQuestionsForResponse(scenarioId)
+        setQuestions(questionsData)
+        // Initialize question responses
+        const initialResponses = new Map<number, { freeText: string; selectedTagIds: number[] }>()
+        questionsData.forEach(q => {
+          initialResponses.set(q.id, { freeText: '', selectedTagIds: [] })
+        })
+        setQuestionResponses(initialResponses)
+      } catch (err) {
+        console.error('Failed to load questions:', err)
+      } finally {
+        setLoadingQuestions(false)
+      }
+    }
+    loadQuestions()
+  }, [scenarioId])
+
+  // Check if all required questions are answered (memoized)
+  const areRequiredQuestionsAnswered = useMemo(() => {
+    for (const question of questions) {
+      if (question.is_required) {
+        const response = questionResponses.get(question.id)
+        if (!response) return false
+        
+        // Check if free text is required and provided
+        if (question.free_text_required && (!response.freeText || !response.freeText.trim())) {
+          return false
+        }
+      }
+    }
+    return true
+  }, [questions, questionResponses])
+
+  // Update parent when question responses change
+  useEffect(() => {
+    if (onQuestionResponsesChange) {
+      const responses: QuestionResponseCreate[] = Array.from(questionResponses.entries()).map(([questionId, response]) => ({
+        post_response_question_id: questionId,
+        free_text_response: response.freeText || undefined,
+        selected_tag_ids: response.selectedTagIds
+      }))
+      onQuestionResponsesChange(responses)
+    }
+  }, [questionResponses, onQuestionResponsesChange])
+
+  // Update validation state when it changes
+  useEffect(() => {
+    if (onValidationChange) {
+      onValidationChange(areRequiredQuestionsAnswered)
+    }
+  }, [areRequiredQuestionsAnswered, onValidationChange])
 
   // Close tooltip when clicking outside
   useEffect(() => {
@@ -187,6 +250,24 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
     return rounded.toFixed(1)
   }
 
+  // Handle question response changes
+  const handleQuestionFreeTextChange = (questionId: number, value: string) => {
+    const updated = new Map(questionResponses)
+    const current = updated.get(questionId) || { freeText: '', selectedTagIds: [] }
+    updated.set(questionId, { ...current, freeText: value })
+    setQuestionResponses(updated)
+  }
+
+  const handleQuestionTagToggle = (questionId: number, tagId: number) => {
+    const updated = new Map(questionResponses)
+    const current = updated.get(questionId) || { freeText: '', selectedTagIds: [] }
+    const tagIds = current.selectedTagIds.includes(tagId)
+      ? current.selectedTagIds.filter(id => id !== tagId)
+      : [...current.selectedTagIds, tagId]
+    updated.set(questionId, { ...current, selectedTagIds: tagIds })
+    setQuestionResponses(updated)
+  }
+
   return (
     <div className="statistics-view">
       <div className="seat-selection-app">
@@ -269,6 +350,63 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
                   </div>
                 )
               })()}
+
+              {/* Questions Section */}
+              {questions.length > 0 && (
+                <div className="questions-response-section">
+                  <h3 className="questions-response-title">Questions</h3>
+                  {questions.map((question) => {
+                    const response = questionResponses.get(question.id) || { freeText: '', selectedTagIds: [] }
+                    const isRequired = question.is_required
+                    const isFreeTextRequired = question.free_text_required
+                    const isFreeTextValid = !isFreeTextRequired || (response.freeText && response.freeText.trim().length > 0)
+                    const isValid = !isRequired || (isFreeTextValid)
+                    
+                    return (
+                      <div key={question.id} className={`question-response-item ${!isValid ? 'question-invalid' : ''}`}>
+                        <label className="question-label">
+                          {question.question.question_text}
+                          {isRequired && <span className="required-indicator"> *</span>}
+                        </label>
+                        {question.question.allows_free_text && (
+                          <textarea
+                            value={response.freeText}
+                            onChange={(e) => handleQuestionFreeTextChange(question.id, e.target.value)}
+                            placeholder={isFreeTextRequired ? "This field is required" : "Optional free text response"}
+                            className="question-free-text"
+                            rows={3}
+                            required={isFreeTextRequired}
+                          />
+                        )}
+                        {question.question.allows_tags && question.tags.length > 0 && (
+                          <div className="question-tags-selection">
+                            <div className="tags-selection-grid">
+                              {question.tags.map((tag) => (
+                                <label key={tag.id} className="tag-selection-checkbox">
+                                  <input
+                                    type="checkbox"
+                                    checked={response.selectedTagIds.includes(tag.id)}
+                                    onChange={() => handleQuestionTagToggle(question.id, tag.id)}
+                                  />
+                                  <span>{tag.tag_text}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {!isValid && (
+                          <p className="question-error-message">
+                            {isFreeTextRequired && (!response.freeText || !response.freeText.trim()) 
+                              ? 'Free text response is required'
+                              : 'This question is required'}
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
               <h3>Response Summary</h3>
               <div className="statistics-filters">
                 <label htmlFor="gender-filter" className="filter-label">

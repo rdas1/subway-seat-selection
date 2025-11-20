@@ -10,7 +10,23 @@ from datetime import datetime, timedelta
 import os
 import random
 from database import init_db, close_db, get_db
-from models import Base, TrainConfiguration, UserResponse, ScenarioGroup, ScenarioGroupItem, User, EmailVerification, ScenarioGroupEditor, Study
+from models import (
+    Base, TrainConfiguration, UserResponse, ScenarioGroup, ScenarioGroupItem, User, 
+    EmailVerification, ScenarioGroupEditor, Study, Question, PostResponseQuestion, 
+    QuestionTag, QuestionTagAssignment, QuestionResponse, QuestionResponseTag
+)
+
+# Default tags that should be available for the default question
+DEFAULT_TAGS = [
+    "comfort",
+    "maximizing personal space",
+    "accessibility",
+    "convenience",
+    "privacy",
+    "safety",
+    "view",
+    "proximity to door"
+]
 from schemas import (
     TrainConfigurationCreate,
     TrainConfigurationResponse,
@@ -29,7 +45,17 @@ from schemas import (
     ScenarioGroupEditorResponse,
     StudyCreate,
     StudyUpdate,
-    StudyResponse
+    StudyResponse,
+    QuestionCreate,
+    QuestionResponse as QuestionResponseSchema,
+    PostResponseQuestionCreate,
+    PostResponseQuestionResponse,
+    QuestionTagCreate,
+    QuestionTagResponse,
+    QuestionResponseCreate,
+    QuestionResponseResponse,
+    TagStatisticsResponse,
+    TagLibraryResponse
 )
 from services.email import send_verification_email
 from utils.auth import create_access_token, generate_verification_token, generate_verification_code
@@ -43,6 +69,34 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown
     await close_db()
+
+async def get_or_create_default_tags(db: AsyncSession) -> List[QuestionTag]:
+    """
+    Get or create default tags. Returns a list of QuestionTag objects.
+    """
+    default_tags = []
+    
+    for tag_text in DEFAULT_TAGS:
+        # Check if tag already exists
+        tag_result = await db.execute(
+            select(QuestionTag).where(QuestionTag.tag_text == tag_text)
+        )
+        tag = tag_result.scalar_one_or_none()
+        
+        if not tag:
+            # Create the tag
+            tag = QuestionTag(
+                tag_text=tag_text,
+                created_by_user_id=None,  # Default tags are system-created
+                is_default=True
+            )
+            db.add(tag)
+            await db.flush()
+        
+        default_tags.append(tag)
+    
+    return default_tags
+
 
 app = FastAPI(
     title="Subway Seat Selection API",
@@ -126,6 +180,39 @@ async def create_train_configuration(
     )
     
     db.add(db_config)
+    await db.commit()
+    await db.refresh(db_config)
+    
+    # Create default question "Why did you choose this spot?"
+    default_question = Question(
+        question_text="Why did you choose this spot?",
+        allows_free_text=True,
+        allows_tags=True
+    )
+    db.add(default_question)
+    await db.flush()  # Flush to get the question ID
+    
+    default_post_response_question = PostResponseQuestion(
+        question_id=default_question.id,
+        train_configuration_id=db_config.id,
+        is_required=False,
+        free_text_required=False,
+        order=0,
+        is_default=True
+    )
+    db.add(default_post_response_question)
+    await db.flush()
+    
+    # Get or create default tags and assign them to the default question
+    default_tags = await get_or_create_default_tags(db)
+    for order, tag in enumerate(default_tags):
+        assignment = QuestionTagAssignment(
+            question_id=default_question.id,
+            tag_id=tag.id,
+            order=order
+        )
+        db.add(assignment)
+    
     await db.commit()
     await db.refresh(db_config)
     
@@ -1518,4 +1605,722 @@ async def delete_study(
     await db.commit()
     
     return None
+
+
+# Question Endpoints
+
+@app.post("/train-configurations/{config_id}/questions", response_model=PostResponseQuestionResponse, status_code=status.HTTP_201_CREATED)
+async def create_post_response_question(
+    config_id: int,
+    question_data: PostResponseQuestionCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Create a post-response question for a scenario.
+    Requires authentication.
+    """
+    # Verify train configuration exists
+    config_result = await db.execute(
+        select(TrainConfiguration).where(TrainConfiguration.id == config_id)
+    )
+    config = config_result.scalar_one_or_none()
+    
+    if config is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Train configuration with id {config_id} not found"
+        )
+    
+    # Check if scenario is in a study (for validation of is_required and free_text_required)
+    from models import ScenarioGroupItem, Study
+    scenario_in_study = False
+    item_result = await db.execute(
+        select(ScenarioGroupItem).where(ScenarioGroupItem.train_configuration_id == config_id)
+    )
+    items = item_result.scalars().all()
+    if items:
+        group_ids = [item.scenario_group_id for item in items]
+        study_result = await db.execute(
+            select(Study).where(Study.scenario_group_id.in_(group_ids))
+        )
+        scenario_in_study = study_result.scalar_one_or_none() is not None
+    
+    # Validate is_required and free_text_required only allowed if scenario is in a study
+    if (question_data.is_required or question_data.free_text_required) and not scenario_in_study:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="is_required and free_text_required can only be set when scenario is part of a study"
+        )
+    
+    # Create or link question
+    if question_data.question_id:
+        # Link to existing question
+        question_result = await db.execute(
+            select(Question).where(Question.id == question_data.question_id)
+        )
+        question = question_result.scalar_one_or_none()
+        if question is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Question with id {question_data.question_id} not found"
+            )
+    else:
+        # Create new question
+        if not question_data.question_text:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="question_text is required when question_id is not provided"
+            )
+        question = Question(
+            question_text=question_data.question_text,
+            allows_free_text=question_data.allows_free_text,
+            allows_tags=question_data.allows_tags
+        )
+        db.add(question)
+        await db.flush()
+    
+    # Create PostResponseQuestion
+    post_response_question = PostResponseQuestion(
+        question_id=question.id,
+        train_configuration_id=config_id,
+        is_required=question_data.is_required,
+        free_text_required=question_data.free_text_required,
+        order=question_data.order,
+        is_default=False
+    )
+    db.add(post_response_question)
+    await db.flush()
+    
+    # Assign tags if provided
+    if question_data.tag_ids:
+        for tag_id in question_data.tag_ids:
+            tag_result = await db.execute(
+                select(QuestionTag).where(QuestionTag.id == tag_id)
+            )
+            tag = tag_result.scalar_one_or_none()
+            if tag is None:
+                continue  # Skip invalid tag IDs
+            
+            # Check if assignment already exists
+            existing_result = await db.execute(
+                select(QuestionTagAssignment).where(
+                    and_(
+                        QuestionTagAssignment.question_id == question.id,
+                        QuestionTagAssignment.tag_id == tag_id
+                    )
+                )
+            )
+            if existing_result.scalar_one_or_none() is None:
+                assignment = QuestionTagAssignment(
+                    question_id=question.id,
+                    tag_id=tag_id,
+                    order=len(question_data.tag_ids) - question_data.tag_ids.index(tag_id)
+                )
+                db.add(assignment)
+    
+    await db.commit()
+    
+    # Reload with relationships
+    result = await db.execute(
+        select(PostResponseQuestion)
+        .where(PostResponseQuestion.id == post_response_question.id)
+        .options(
+            selectinload(PostResponseQuestion.question),
+            selectinload(PostResponseQuestion.question).selectinload(Question.tag_assignments).selectinload(QuestionTagAssignment.tag)
+        )
+    )
+    post_response_question = result.scalar_one()
+    
+    # Build response
+    tags = [assignment.tag for assignment in post_response_question.question.tag_assignments]
+    return PostResponseQuestionResponse(
+        id=post_response_question.id,
+        question_id=post_response_question.question_id,
+        train_configuration_id=post_response_question.train_configuration_id,
+        is_required=post_response_question.is_required,
+        free_text_required=post_response_question.free_text_required,
+        order=post_response_question.order,
+        is_default=post_response_question.is_default,
+        created_at=post_response_question.created_at,
+        updated_at=post_response_question.updated_at,
+        question=QuestionResponseSchema(
+            id=post_response_question.question.id,
+            question_text=post_response_question.question.question_text,
+            allows_free_text=post_response_question.question.allows_free_text,
+            allows_tags=post_response_question.question.allows_tags,
+            created_at=post_response_question.question.created_at,
+            updated_at=post_response_question.question.updated_at
+        ),
+        tags=[QuestionTagResponse(
+            id=tag.id,
+            tag_text=tag.tag_text,
+            is_default=tag.is_default,
+            created_by_user_id=tag.created_by_user_id,
+            created_at=tag.created_at
+        ) for tag in tags]
+    )
+
+
+@app.get("/train-configurations/{config_id}/questions", response_model=List[PostResponseQuestionResponse])
+async def get_post_response_questions(
+    config_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all post-response questions for a scenario.
+    """
+    result = await db.execute(
+        select(PostResponseQuestion)
+        .where(PostResponseQuestion.train_configuration_id == config_id)
+        .options(
+            selectinload(PostResponseQuestion.question),
+            selectinload(PostResponseQuestion.question).selectinload(Question.tag_assignments).selectinload(QuestionTagAssignment.tag)
+        )
+        .order_by(PostResponseQuestion.order)
+    )
+    questions = result.scalars().all()
+    
+    # Build responses
+    responses = []
+    for post_q in questions:
+        tags = [assignment.tag for assignment in post_q.question.tag_assignments]
+        responses.append(PostResponseQuestionResponse(
+            id=post_q.id,
+            question_id=post_q.question_id,
+            train_configuration_id=post_q.train_configuration_id,
+            is_required=post_q.is_required,
+            free_text_required=post_q.free_text_required,
+            order=post_q.order,
+            is_default=post_q.is_default,
+            created_at=post_q.created_at,
+            updated_at=post_q.updated_at,
+            question=QuestionResponseSchema(
+                id=post_q.question.id,
+                question_text=post_q.question.question_text,
+                allows_free_text=post_q.question.allows_free_text,
+                allows_tags=post_q.question.allows_tags,
+                created_at=post_q.question.created_at,
+                updated_at=post_q.question.updated_at
+            ),
+            tags=[QuestionTagResponse(
+                id=tag.id,
+                tag_text=tag.tag_text,
+                is_default=tag.is_default,
+                created_by_user_id=tag.created_by_user_id,
+                created_at=tag.created_at
+            ) for tag in tags]
+        ))
+    
+    return responses
+
+
+@app.get("/train-configurations/{config_id}/questions-for-response", response_model=List[PostResponseQuestionResponse])
+async def get_questions_for_response(
+    config_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get questions for a scenario (for response page).
+    Same as get_post_response_questions but with a different endpoint name for clarity.
+    """
+    return await get_post_response_questions(config_id, db)
+
+
+@app.put("/train-configurations/{config_id}/questions/{post_response_question_id}", response_model=PostResponseQuestionResponse)
+async def update_post_response_question(
+    config_id: int,
+    post_response_question_id: int,
+    question_data: PostResponseQuestionCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update a post-response question.
+    Requires authentication.
+    """
+    # Verify PostResponseQuestion exists and belongs to config
+    result = await db.execute(
+        select(PostResponseQuestion).where(
+            and_(
+                PostResponseQuestion.id == post_response_question_id,
+                PostResponseQuestion.train_configuration_id == config_id
+            )
+        )
+        .options(selectinload(PostResponseQuestion.question))
+    )
+    post_response_question = result.scalar_one_or_none()
+    
+    if post_response_question is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Post-response question with id {post_response_question_id} not found"
+        )
+    
+    # Check if scenario is in a study
+    from models import ScenarioGroupItem, Study
+    scenario_in_study = False
+    item_result = await db.execute(
+        select(ScenarioGroupItem).where(ScenarioGroupItem.train_configuration_id == config_id)
+    )
+    items = item_result.scalars().all()
+    if items:
+        group_ids = [item.scenario_group_id for item in items]
+        study_result = await db.execute(
+            select(Study).where(Study.scenario_group_id.in_(group_ids))
+        )
+        scenario_in_study = study_result.scalar_one_or_none() is not None
+    
+    # Validate is_required and free_text_required
+    if (question_data.is_required or question_data.free_text_required) and not scenario_in_study:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="is_required and free_text_required can only be set when scenario is part of a study"
+        )
+    
+    # Update question if not default (cannot edit question_text if is_default)
+    if not post_response_question.is_default:
+        if question_data.question_text:
+            post_response_question.question.question_text = question_data.question_text
+        post_response_question.question.allows_free_text = question_data.allows_free_text
+        post_response_question.question.allows_tags = question_data.allows_tags
+    
+    # Update PostResponseQuestion fields
+    post_response_question.is_required = question_data.is_required
+    post_response_question.free_text_required = question_data.free_text_required
+    post_response_question.order = question_data.order
+    
+    # Update tag assignments
+    if question_data.tag_ids is not None:
+        # Remove existing assignments
+        await db.execute(
+            select(QuestionTagAssignment).where(
+                QuestionTagAssignment.question_id == post_response_question.question_id
+            )
+        )
+        existing_assignments = await db.execute(
+            select(QuestionTagAssignment).where(
+                QuestionTagAssignment.question_id == post_response_question.question_id
+            )
+        )
+        for assignment in existing_assignments.scalars().all():
+            await db.delete(assignment)
+        
+        # Add new assignments
+        for tag_id in question_data.tag_ids:
+            tag_result = await db.execute(
+                select(QuestionTag).where(QuestionTag.id == tag_id)
+            )
+            tag = tag_result.scalar_one_or_none()
+            if tag is None:
+                continue
+            
+            assignment = QuestionTagAssignment(
+                question_id=post_response_question.question_id,
+                tag_id=tag_id,
+                order=len(question_data.tag_ids) - question_data.tag_ids.index(tag_id)
+            )
+            db.add(assignment)
+    
+    await db.commit()
+    
+    # Reload with relationships
+    result = await db.execute(
+        select(PostResponseQuestion)
+        .where(PostResponseQuestion.id == post_response_question_id)
+        .options(
+            selectinload(PostResponseQuestion.question),
+            selectinload(PostResponseQuestion.question).selectinload(Question.tag_assignments).selectinload(QuestionTagAssignment.tag)
+        )
+    )
+    post_response_question = result.scalar_one()
+    
+    # Build response
+    tags = [assignment.tag for assignment in post_response_question.question.tag_assignments]
+    return PostResponseQuestionResponse(
+        id=post_response_question.id,
+        question_id=post_response_question.question_id,
+        train_configuration_id=post_response_question.train_configuration_id,
+        is_required=post_response_question.is_required,
+        free_text_required=post_response_question.free_text_required,
+        order=post_response_question.order,
+        is_default=post_response_question.is_default,
+        created_at=post_response_question.created_at,
+        updated_at=post_response_question.updated_at,
+        question=QuestionResponseSchema(
+            id=post_response_question.question.id,
+            question_text=post_response_question.question.question_text,
+            allows_free_text=post_response_question.question.allows_free_text,
+            allows_tags=post_response_question.question.allows_tags,
+            created_at=post_response_question.question.created_at,
+            updated_at=post_response_question.question.updated_at
+        ),
+        tags=[QuestionTagResponse(
+            id=tag.id,
+            tag_text=tag.tag_text,
+            is_default=tag.is_default,
+            created_by_user_id=tag.created_by_user_id,
+            created_at=tag.created_at
+        ) for tag in tags]
+    )
+
+
+@app.delete("/train-configurations/{config_id}/questions/{post_response_question_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_post_response_question(
+    config_id: int,
+    post_response_question_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Delete a post-response question.
+    Requires authentication.
+    """
+    result = await db.execute(
+        select(PostResponseQuestion).where(
+            and_(
+                PostResponseQuestion.id == post_response_question_id,
+                PostResponseQuestion.train_configuration_id == config_id
+            )
+        )
+        .options(selectinload(PostResponseQuestion.question))
+    )
+    post_response_question = result.scalar_one_or_none()
+    
+    if post_response_question is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Post-response question with id {post_response_question_id} not found"
+        )
+    
+    question_id = post_response_question.question_id
+    
+    # Delete PostResponseQuestion
+    await db.delete(post_response_question)
+    
+    # Check if question is used by other PostResponseQuestions (or future PreResponseQuestion, etc.)
+    other_post_result = await db.execute(
+        select(PostResponseQuestion).where(
+            and_(
+                PostResponseQuestion.question_id == question_id,
+                PostResponseQuestion.id != post_response_question_id
+            )
+        )
+    )
+    other_posts = other_post_result.scalars().all()
+    
+    # If no other references, delete the question and its tag assignments
+    if not other_posts:
+        # Delete tag assignments
+        assignments_result = await db.execute(
+            select(QuestionTagAssignment).where(QuestionTagAssignment.question_id == question_id)
+        )
+        for assignment in assignments_result.scalars().all():
+            await db.delete(assignment)
+        
+        # Delete question
+        question_result = await db.execute(
+            select(Question).where(Question.id == question_id)
+        )
+        question = question_result.scalar_one_or_none()
+        if question:
+            await db.delete(question)
+    
+    await db.commit()
+    
+    return None
+
+
+@app.get("/questions/tag-library", response_model=TagLibraryResponse)
+async def get_tag_library(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get tag library (default tags, your tags, community tags).
+    Requires authentication.
+    """
+    # Get default tags
+    default_result = await db.execute(
+        select(QuestionTag).where(QuestionTag.is_default == True).order_by(QuestionTag.tag_text)
+    )
+    default_tags = default_result.scalars().all()
+    
+    # Get user's tags
+    your_result = await db.execute(
+        select(QuestionTag).where(
+            and_(
+                QuestionTag.created_by_user_id == current_user.id,
+                QuestionTag.is_default == False
+            )
+        ).order_by(QuestionTag.tag_text)
+    )
+    your_tags = your_result.scalars().all()
+    
+    # Get community tags (non-default tags created by other users)
+    community_result = await db.execute(
+        select(QuestionTag).where(
+            and_(
+                QuestionTag.is_default == False,
+                QuestionTag.created_by_user_id != current_user.id,
+                QuestionTag.created_by_user_id.isnot(None)
+            )
+        ).order_by(QuestionTag.tag_text)
+    )
+    community_tags = community_result.scalars().all()
+    
+    return TagLibraryResponse(
+        default_tags=[QuestionTagResponse(
+            id=tag.id,
+            tag_text=tag.tag_text,
+            is_default=tag.is_default,
+            created_by_user_id=tag.created_by_user_id,
+            created_at=tag.created_at
+        ) for tag in default_tags],
+        your_tags=[QuestionTagResponse(
+            id=tag.id,
+            tag_text=tag.tag_text,
+            is_default=tag.is_default,
+            created_by_user_id=tag.created_by_user_id,
+            created_at=tag.created_at
+        ) for tag in your_tags],
+        community_tags=[QuestionTagResponse(
+            id=tag.id,
+            tag_text=tag.tag_text,
+            is_default=tag.is_default,
+            created_by_user_id=tag.created_by_user_id,
+            created_at=tag.created_at
+        ) for tag in community_tags]
+    )
+
+
+@app.post("/questions/tags", response_model=QuestionTagResponse, status_code=status.HTTP_201_CREATED)
+async def create_question_tag(
+    tag_data: QuestionTagCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Create a new question tag.
+    Requires authentication.
+    """
+    # Check if tag already exists
+    existing_result = await db.execute(
+        select(QuestionTag).where(QuestionTag.tag_text == tag_data.tag_text)
+    )
+    if existing_result.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Tag with text '{tag_data.tag_text}' already exists"
+        )
+    
+    # Only admin can create default tags (for now, we'll prevent it)
+    if tag_data.is_default:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can create default tags"
+        )
+    
+    tag = QuestionTag(
+        tag_text=tag_data.tag_text,
+        created_by_user_id=current_user.id,
+        is_default=False
+    )
+    db.add(tag)
+    await db.commit()
+    await db.refresh(tag)
+    
+    return QuestionTagResponse(
+        id=tag.id,
+        tag_text=tag.tag_text,
+        is_default=tag.is_default,
+        created_by_user_id=tag.created_by_user_id,
+        created_at=tag.created_at
+    )
+
+
+@app.post("/user-responses/{response_id}/question-responses", response_model=List[QuestionResponseResponse])
+async def submit_question_responses(
+    response_id: int,
+    responses: List[QuestionResponseCreate],
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Submit question responses for a user response.
+    """
+    # Verify user response exists
+    response_result = await db.execute(
+        select(UserResponse).where(UserResponse.id == response_id)
+    )
+    user_response = response_result.scalar_one_or_none()
+    
+    if user_response is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User response with id {response_id} not found"
+        )
+    
+    question_responses = []
+    
+    for response_data in responses:
+        # Verify post-response question exists
+        post_q_result = await db.execute(
+            select(PostResponseQuestion).where(
+                PostResponseQuestion.id == response_data.post_response_question_id
+            )
+            .options(selectinload(PostResponseQuestion.question))
+        )
+        post_q = post_q_result.scalar_one_or_none()
+        
+        if post_q is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Post-response question with id {response_data.post_response_question_id} not found"
+            )
+        
+        # Validate free_text_required
+        if post_q.free_text_required and (not response_data.free_text_response or not response_data.free_text_response.strip()):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Free text response is required for question {post_q.id}"
+            )
+        
+        # Create question response
+        question_response = QuestionResponse(
+            user_response_id=response_id,
+            post_response_question_id=response_data.post_response_question_id,
+            free_text_response=response_data.free_text_response
+        )
+        db.add(question_response)
+        await db.flush()
+        
+        # Add selected tags
+        if response_data.selected_tag_ids:
+            for tag_id in response_data.selected_tag_ids:
+                # Verify tag exists and is assigned to the question
+                tag_result = await db.execute(
+                    select(QuestionTag).where(QuestionTag.id == tag_id)
+                )
+                tag = tag_result.scalar_one_or_none()
+                if tag is None:
+                    continue
+                
+                # Check if tag is assigned to the question
+                assignment_result = await db.execute(
+                    select(QuestionTagAssignment).where(
+                        and_(
+                            QuestionTagAssignment.question_id == post_q.question_id,
+                            QuestionTagAssignment.tag_id == tag_id
+                        )
+                    )
+                )
+                if assignment_result.scalar_one_or_none() is None:
+                    continue  # Skip tags not assigned to this question
+                
+                response_tag = QuestionResponseTag(
+                    question_response_id=question_response.id,
+                    tag_id=tag_id
+                )
+                db.add(response_tag)
+        
+        question_responses.append(question_response)
+    
+    await db.commit()
+    
+    # Reload with relationships
+    result_responses = []
+    for qr in question_responses:
+        result = await db.execute(
+            select(QuestionResponse)
+            .where(QuestionResponse.id == qr.id)
+            .options(selectinload(QuestionResponse.selected_tags).selectinload(QuestionResponseTag.tag))
+        )
+        qr = result.scalar_one()
+        
+        result_responses.append(QuestionResponseResponse(
+            id=qr.id,
+            user_response_id=qr.user_response_id,
+            post_response_question_id=qr.post_response_question_id,
+            free_text_response=qr.free_text_response,
+            created_at=qr.created_at,
+            selected_tags=[QuestionTagResponse(
+                id=tag.tag.id,
+                tag_text=tag.tag.tag_text,
+                is_default=tag.tag.is_default,
+                created_by_user_id=tag.tag.created_by_user_id,
+                created_at=tag.tag.created_at
+            ) for tag in qr.selected_tags]
+        ))
+    
+    return result_responses
+
+
+@app.get("/train-configurations/{config_id}/questions/{post_response_question_id}/tag-statistics", response_model=List[TagStatisticsResponse])
+async def get_tag_statistics(
+    config_id: int,
+    post_response_question_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get tag usage statistics for a question.
+    """
+    # Verify post-response question exists and belongs to config
+    result = await db.execute(
+        select(PostResponseQuestion).where(
+            and_(
+                PostResponseQuestion.id == post_response_question_id,
+                PostResponseQuestion.train_configuration_id == config_id
+            )
+        )
+        .options(selectinload(PostResponseQuestion.question))
+    )
+    post_q = result.scalar_one_or_none()
+    
+    if post_q is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Post-response question with id {post_response_question_id} not found"
+        )
+    
+    # Get all question responses for this post-response question
+    qr_result = await db.execute(
+        select(QuestionResponse).where(
+            QuestionResponse.post_response_question_id == post_response_question_id
+        )
+        .options(selectinload(QuestionResponse.selected_tags))
+    )
+    question_responses = qr_result.scalars().all()
+    
+    # Count tag selections
+    tag_counts = {}
+    for qr in question_responses:
+        for response_tag in qr.selected_tags:
+            tag_id = response_tag.tag_id
+            if tag_id not in tag_counts:
+                tag_counts[tag_id] = 0
+            tag_counts[tag_id] += 1
+    
+    # Get tag details
+    if not tag_counts:
+        return []
+    
+    tags_result = await db.execute(
+        select(QuestionTag).where(QuestionTag.id.in_(tag_counts.keys()))
+    )
+    tags = {tag.id: tag for tag in tags_result.scalars().all()}
+    
+    # Build statistics
+    statistics = []
+    for tag_id, count in tag_counts.items():
+        if tag_id in tags:
+            statistics.append(TagStatisticsResponse(
+                tag_id=tag_id,
+                tag_text=tags[tag_id].tag_text,
+                selection_count=count
+            ))
+    
+    # Sort by selection count descending
+    statistics.sort(key=lambda x: x.selection_count, reverse=True)
+    
+    return statistics
 

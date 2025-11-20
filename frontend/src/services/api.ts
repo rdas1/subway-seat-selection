@@ -135,6 +135,75 @@ export const trainConfigApi = {
 
     return response.json();
   },
+
+  async getQuestions(configId: number): Promise<PostResponseQuestionResponse[]> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/train-configurations/${configId}/questions`);
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch questions');
+    }
+
+    return response.json();
+  },
+
+  async getQuestionsForResponse(configId: number): Promise<PostResponseQuestionResponse[]> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/train-configurations/${configId}/questions-for-response`);
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch questions for response');
+    }
+
+    return response.json();
+  },
+
+  async createQuestion(configId: number, question: PostResponseQuestionCreate): Promise<PostResponseQuestionResponse> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/train-configurations/${configId}/questions`, {
+      method: 'POST',
+      body: JSON.stringify(question),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to create question' }));
+      throw new Error(error.detail || 'Failed to create question');
+    }
+
+    return response.json();
+  },
+
+  async updateQuestion(configId: number, questionId: number, question: PostResponseQuestionCreate): Promise<PostResponseQuestionResponse> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/train-configurations/${configId}/questions/${questionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(question),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to update question' }));
+      throw new Error(error.detail || 'Failed to update question');
+    }
+
+    return response.json();
+  },
+
+  async deleteQuestion(configId: number, questionId: number): Promise<void> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/train-configurations/${configId}/questions/${questionId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to delete question' }));
+      throw new Error(error.detail || 'Failed to delete question');
+    }
+  },
+
+  async getTagStatistics(configId: number, questionId: number): Promise<TagStatisticsResponse[]> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/train-configurations/${configId}/questions/${questionId}/tag-statistics`);
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch tag statistics');
+    }
+
+    return response.json();
+  },
 };
 
 // User Response API
@@ -235,6 +304,20 @@ export const userResponseApi = {
     });
     
     return responses.length > 0 ? responses[0] : null;
+  },
+
+  async submitQuestionResponses(responseId: number, responses: QuestionResponseCreate[]): Promise<QuestionResponseResponse[]> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/user-responses/${responseId}/question-responses`, {
+      method: 'POST',
+      body: JSON.stringify(responses),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to submit question responses' }));
+      throw new Error(error.detail || 'Failed to submit question responses');
+    }
+
+    return response.json();
   },
 };
 
@@ -474,4 +557,105 @@ export const studyApi = {
     }
   },
 };
+
+// Question API
+export interface QuestionTagResponse {
+  id: number;
+  tag_text: string;
+  is_default: boolean;
+  created_by_user_id?: number;
+  created_at: string;
+}
+
+export interface PostResponseQuestionResponse {
+  id: number;
+  question_id: number;
+  train_configuration_id: number;
+  is_required: boolean;
+  free_text_required: boolean;
+  order: number;
+  is_default: boolean;
+  created_at: string;
+  updated_at?: string;
+  question: {
+    id: number;
+    question_text: string;
+    allows_free_text: boolean;
+    allows_tags: boolean;
+    created_at: string;
+    updated_at?: string;
+  };
+  tags: QuestionTagResponse[];
+}
+
+export interface PostResponseQuestionCreate {
+  question_id?: number;
+  question_text?: string;
+  is_required?: boolean;
+  free_text_required?: boolean;
+  allows_free_text?: boolean;
+  allows_tags?: boolean;
+  order?: number;
+  tag_ids?: number[];
+}
+
+export interface QuestionTagCreate {
+  tag_text: string;
+  is_default?: boolean;
+}
+
+export interface QuestionResponseCreate {
+  post_response_question_id: number;
+  free_text_response?: string;
+  selected_tag_ids?: number[];
+}
+
+export interface QuestionResponseResponse {
+  id: number;
+  user_response_id: number;
+  post_response_question_id: number;
+  free_text_response?: string;
+  created_at: string;
+  selected_tags: QuestionTagResponse[];
+}
+
+export interface TagStatisticsResponse {
+  tag_id: number;
+  tag_text: string;
+  selection_count: number;
+}
+
+export interface TagLibraryResponse {
+  default_tags: QuestionTagResponse[];
+  your_tags: QuestionTagResponse[];
+  community_tags: QuestionTagResponse[];
+}
+
+export const questionApi = {
+  async getTagLibrary(): Promise<TagLibraryResponse> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/questions/tag-library`);
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch tag library');
+    }
+
+    return response.json();
+  },
+
+  async createTag(tag: QuestionTagCreate): Promise<QuestionTagResponse> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/questions/tags`, {
+      method: 'POST',
+      body: JSON.stringify(tag),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to create tag' }));
+      throw new Error(error.detail || 'Failed to create tag');
+    }
+
+    return response.json();
+  },
+};
+
+// Extend userResponseApi with question response method
 

@@ -97,20 +97,20 @@ function Navigation() {
           </div>
           {/* Mobile: show dropdown items directly */}
           <div className="nav-dropdown-mobile">
-            <Link 
-              to="/scenario-editor" 
+          <Link 
+            to="/scenario-editor" 
               className={location.pathname.startsWith('/scenario-editor') ? 'active' : ''}
-              onClick={closeMobileMenu}
-            >
+            onClick={closeMobileMenu}
+          >
               Scenario
-            </Link>
-            <Link 
-              to="/study-builder" 
+          </Link>
+          <Link 
+            to="/study-builder" 
               className={location.pathname.startsWith('/study-builder') ? 'active' : ''}
-              onClick={closeMobileMenu}
-            >
+            onClick={closeMobileMenu}
+          >
               Study
-            </Link>
+          </Link>
           </div>
           {user && (
             <>

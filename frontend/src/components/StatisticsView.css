@@ -378,3 +378,121 @@
   color: white;
 }
 
+/* Questions Response Section */
+.questions-response-section {
+    /* margin: 1.5rem 0; */
+    /* padding: 1.5rem; */
+    padding: 12px;
+    background-color: #2a2a2c;
+    border: 1px solid #3a3a3c;
+    border-radius: 8px;
+  }
+  
+  .questions-response-title {
+    color: white;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 0 0 1.5rem 0;
+  }
+  
+  .question-response-item {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #3a3a3c;
+  }
+  
+  .question-response-item:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+  
+  .question-response-item.question-invalid {
+    border-left: 3px solid #dc3545;
+    padding-left: 1rem;
+  }
+  
+  .question-label {
+    display: block;
+    color: white;
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+  }
+  
+  .required-indicator {
+    color: #dc3545;
+  }
+  
+  .question-free-text {
+    width: 100%;
+    padding: 0.75rem;
+    background-color: #3a3a3c;
+    border: 1px solid #565658;
+    border-radius: 4px;
+    color: white;
+    font-size: 1rem;
+    font-family: inherit;
+    resize: vertical;
+    margin-bottom: 1rem;
+    box-sizing: border-box;
+  }
+  
+  .question-free-text:focus {
+    outline: none;
+    border-color: #4a90e2;
+  }
+  
+  .question-free-text::placeholder {
+    color: #a0a0a0;
+  }
+  
+  .question-tags-selection {
+    margin-top: 0.75rem;
+  }
+  
+  .tags-selection-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+  
+  .tag-selection-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background-color: #3a3a3c;
+    border: 1px solid #565658;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #d7dadc;
+    font-size: 0.9rem;
+  }
+  
+  .tag-selection-checkbox:hover {
+    background-color: #4a4a4c;
+    border-color: #4a90e2;
+  }
+  
+  .tag-selection-checkbox input[type="checkbox"] {
+    cursor: pointer;
+  }
+  
+  .tag-selection-checkbox input[type="checkbox"]:checked + span {
+    color: #4a90e2;
+    font-weight: 600;
+  }
+  
+  .question-error-message {
+    color: #ff6b6b;
+    font-size: 0.85rem;
+    margin: 0.5rem 0 0 0;
+    font-style: italic;
+  }
+  
+  
+
+
+

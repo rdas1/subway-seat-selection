@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, UniqueConstraint, Index
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, UniqueConstraint, Index, Boolean, Text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from database import Base
@@ -21,6 +21,8 @@ class TrainConfiguration(Base):
     
     # Relationship to user responses
     user_responses = relationship("UserResponse", back_populates="train_configuration", cascade="all, delete-orphan")
+    # Relationship to post-response questions
+    post_response_questions = relationship("PostResponseQuestion", back_populates="train_configuration", cascade="all, delete-orphan")
 
 
 class UserResponse(Base):
@@ -41,6 +43,8 @@ class UserResponse(Base):
     
     # Relationship to train configuration
     train_configuration = relationship("TrainConfiguration", back_populates="user_responses")
+    # Relationship to question responses
+    question_responses = relationship("QuestionResponse", back_populates="user_response", cascade="all, delete-orphan")
 
 
 class User(Base):
@@ -58,6 +62,7 @@ class User(Base):
     created_scenario_groups = relationship("ScenarioGroup", back_populates="created_by_user", foreign_keys="ScenarioGroup.created_by_user_id")
     scenario_group_editors = relationship("ScenarioGroupEditor", back_populates="user", cascade="all, delete-orphan")
     created_studies = relationship("Study", back_populates="created_by_user", foreign_keys="Study.created_by_user_id")
+    created_tags = relationship("QuestionTag", back_populates="created_by_user", foreign_keys="QuestionTag.created_by_user_id")
 
 
 class EmailVerification(Base):
@@ -150,4 +155,128 @@ class Study(Base):
     # Relationships
     scenario_group = relationship("ScenarioGroup", back_populates="studies")
     created_by_user = relationship("User", back_populates="created_studies", foreign_keys=[created_by_user_id])
+
+
+class Question(Base):
+    """
+    Base model for storing questions (used by PostResponseQuestion, PreResponseQuestion, etc.).
+    """
+    __tablename__ = "questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    question_text = Column(String, nullable=False)
+    allows_free_text = Column(Boolean, nullable=False, default=True)
+    allows_tags = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    post_response_questions = relationship("PostResponseQuestion", back_populates="question", cascade="all, delete-orphan")
+    tag_assignments = relationship("QuestionTagAssignment", back_populates="question", cascade="all, delete-orphan")
+
+
+class PostResponseQuestion(Base):
+    """
+    Model for storing post-response questions linked to train configurations.
+    """
+    __tablename__ = "post_response_questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False, index=True)
+    train_configuration_id = Column(Integer, ForeignKey("train_configurations.id"), nullable=False, index=True)
+    is_required = Column(Boolean, nullable=False, default=False)
+    free_text_required = Column(Boolean, nullable=False, default=False)
+    order = Column(Integer, nullable=False, default=0)
+    is_default = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    question = relationship("Question", back_populates="post_response_questions")
+    train_configuration = relationship("TrainConfiguration", back_populates="post_response_questions")
+    question_responses = relationship("QuestionResponse", back_populates="post_response_question", cascade="all, delete-orphan")
+    
+    # Unique constraint to prevent duplicate question assignments
+    __table_args__ = (
+        UniqueConstraint('question_id', 'train_configuration_id', name='uq_post_response_question'),
+    )
+
+
+class QuestionTag(Base):
+    """
+    Model for storing question tags (global tag library).
+    """
+    __tablename__ = "question_tags"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tag_text = Column(String, nullable=False, unique=True, index=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    is_default = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    created_by_user = relationship("User", back_populates="created_tags", foreign_keys=[created_by_user_id])
+    tag_assignments = relationship("QuestionTagAssignment", back_populates="tag", cascade="all, delete-orphan")
+    question_response_tags = relationship("QuestionResponseTag", back_populates="tag", cascade="all, delete-orphan")
+
+
+class QuestionTagAssignment(Base):
+    """
+    Junction table for linking tags to questions.
+    """
+    __tablename__ = "question_tag_assignments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False, index=True)
+    tag_id = Column(Integer, ForeignKey("question_tags.id"), nullable=False, index=True)
+    order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    question = relationship("Question", back_populates="tag_assignments")
+    tag = relationship("QuestionTag", back_populates="tag_assignments")
+    
+    # Unique constraint to prevent duplicate tag assignments
+    __table_args__ = (
+        UniqueConstraint('question_id', 'tag_id', name='uq_question_tag_assignment'),
+    )
+
+
+class QuestionResponse(Base):
+    """
+    Model for storing user responses to questions.
+    """
+    __tablename__ = "question_responses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_response_id = Column(Integer, ForeignKey("user_responses.id"), nullable=False, index=True)
+    post_response_question_id = Column(Integer, ForeignKey("post_response_questions.id"), nullable=False, index=True)
+    free_text_response = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    user_response = relationship("UserResponse", back_populates="question_responses")
+    post_response_question = relationship("PostResponseQuestion", back_populates="question_responses")
+    selected_tags = relationship("QuestionResponseTag", back_populates="question_response", cascade="all, delete-orphan")
+
+
+class QuestionResponseTag(Base):
+    """
+    Junction table for linking selected tags to question responses.
+    """
+    __tablename__ = "question_response_tags"
+
+    id = Column(Integer, primary_key=True, index=True)
+    question_response_id = Column(Integer, ForeignKey("question_responses.id"), nullable=False, index=True)
+    tag_id = Column(Integer, ForeignKey("question_tags.id"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    question_response = relationship("QuestionResponse", back_populates="selected_tags")
+    tag = relationship("QuestionTag", back_populates="question_response_tags")
+    
+    # Unique constraint to prevent duplicate tag selections
+    __table_args__ = (
+        UniqueConstraint('question_response_id', 'tag_id', name='uq_question_response_tag'),
+    )
 
