@@ -58,7 +58,7 @@ from schemas import (
     TagLibraryResponse
 )
 from services.email import send_verification_email
-from utils.auth import create_access_token, generate_verification_token, generate_verification_code
+from utils.auth import create_access_token, generate_verification_token, generate_verification_code, ACCESS_TOKEN_EXPIRE_MINUTES
 from middleware.auth import get_current_user, get_optional_user
 
 # Lifespan context manager for startup/shutdown events
@@ -621,13 +621,14 @@ async def verify_link(
     access_token = create_access_token(user.id, user.email)
     
     # Set session cookie
+    # Match cookie expiration to token expiration (30 days default)
     response.set_cookie(
         key="session_token",
         value=access_token,
         httponly=True,
         secure=os.getenv("ENVIRONMENT") == "production",  # HTTPS only in production
         samesite="lax",
-        max_age=30 * 60  # 30 minutes
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert minutes to seconds
     )
     
     return AuthResponse(
@@ -688,13 +689,14 @@ async def verify_token(
     access_token = create_access_token(user.id, user.email)
     
     # Set session cookie
+    # Match cookie expiration to token expiration (30 days default)
     response.set_cookie(
         key="session_token",
         value=access_token,
         httponly=True,
         secure=os.getenv("ENVIRONMENT") == "production",
         samesite="lax",
-        max_age=30 * 60  # 30 minutes
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert minutes to seconds
     )
     
     return AuthResponse(

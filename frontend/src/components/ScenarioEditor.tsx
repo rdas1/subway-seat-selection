@@ -875,7 +875,7 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create tag');
       throw err;
-    }
+                }
   };
 
   // Cleanup timer on unmount

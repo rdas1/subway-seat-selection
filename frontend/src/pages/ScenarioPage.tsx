@@ -461,7 +461,7 @@ export default function ScenarioPage() {
           />
         )}
       </main>
-    <footer className="App-footer">
+      <footer className="App-footer">
         {showResults ? (
           <button 
             className="continue-button" 

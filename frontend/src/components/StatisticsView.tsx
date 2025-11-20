@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { SubwayGrid } from '../classes/SubwayGrid'
-import { trainConfigApi, PostResponseQuestionResponse, QuestionResponseCreate, QuestionTagResponse } from '../services/api'
+import { trainConfigApi, PostResponseQuestionResponse, QuestionResponseCreate, QuestionTagResponse, TagStatisticsResponse } from '../services/api'
 import { EMOJI_MAN, EMOJI_WOMAN, EMOJI_NEUTRAL } from '../constants/emojis'
 import Grid from './Grid'
 import './StatisticsView.css'
@@ -29,6 +29,7 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
   const [questions, setQuestions] = useState<PostResponseQuestionResponse[]>([])
   const [loadingQuestions, setLoadingQuestions] = useState(false)
   const [questionResponses, setQuestionResponses] = useState<Map<number, { freeText: string; selectedTagIds: number[] }>>(new Map())
+  const [tagStatistics, setTagStatistics] = useState<Map<number, Map<number, number>>>(new Map()) // questionId -> tagId -> count
   const [tooltip, setTooltip] = useState<{
     row: number
     col: number
@@ -113,6 +114,23 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
           initialResponses.set(q.id, { freeText: '', selectedTagIds: [] })
         })
         setQuestionResponses(initialResponses)
+        
+        // Load tag statistics for each question
+        const statsMap = new Map<number, Map<number, number>>()
+        for (const question of questionsData) {
+          try {
+            const stats = await trainConfigApi.getTagStatistics(scenarioId, question.id)
+            const tagCountMap = new Map<number, number>()
+            stats.forEach(stat => {
+              tagCountMap.set(stat.tag_id, stat.selection_count)
+            })
+            statsMap.set(question.id, tagCountMap)
+          } catch (err) {
+            console.error(`Failed to load tag statistics for question ${question.id}:`, err)
+            statsMap.set(question.id, new Map())
+          }
+        }
+        setTagStatistics(statsMap)
       } catch (err) {
         console.error('Failed to load questions:', err)
       } finally {
@@ -195,26 +213,40 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
     return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
   }
 
-  // Get heatmap color based on percentage of total responses
+  // Get heatmap color based on absolute percentage (0-100%)
+  // Colors are constant regardless of data distribution
   const getHeatmapColor = (count: number): string => {
     if (count === 0 || statistics.total_responses === 0) {
       return '#000' // Black for no responses
     }
     
-    // Calculate percentage of total responses
+    // Calculate absolute percentage of total responses (0-100%)
     const percentage = (count / statistics.total_responses) * 100
     
-    // Define gradient stops (percentage -> color)
+    // Define gradient stops with more granular colors, especially in 50-100% range
+    // These colors are absolute - 50% always looks the same, 100% always looks the same
     const gradientStops = [
-      { percent: 0, color: '#ffeda0' },    // Light yellow
-      { percent: 5, color: '#fee391' },    // Light yellow/orange
-      { percent: 10, color: '#fec44f' },  // Yellow-orange
-      { percent: 15, color: '#fe9929' },  // Orange
-      { percent: 20, color: '#fe7f00' },   // Darker orange
-      { percent: 30, color: '#ec7014' },  // Red-orange
-      { percent: 40, color: '#d94801' },  // Red
-      { percent: 50, color: '#993404' },  // Dark red/maroon
-      { percent: 100, color: '#7a2e05' }, // Darkest red (for very high percentages)
+      { percent: 0, color: '#ffeda0' },    // Light yellow (0%)
+      { percent: 5, color: '#fee391' },    // Light yellow/orange (5%)
+      { percent: 10, color: '#fec44f' },   // Yellow-orange (10%)
+      { percent: 15, color: '#fe9929' },  // Orange (15%)
+      { percent: 20, color: '#fe7f00' },  // Darker orange (20%)
+      { percent: 25, color: '#f97316' },  // Orange-red (25%)
+      { percent: 30, color: '#ec7014' },  // Red-orange (30%)
+      { percent: 35, color: '#dc2626' },  // Red (35%)
+      { percent: 40, color: '#d94801' },  // Dark red (40%)
+      { percent: 45, color: '#b91c1c' }, // Darker red (45%)
+      { percent: 50, color: '#991b1b' }, // Very dark red (50%)
+      { percent: 55, color: '#7f1d1d' }, // Darker (55%)
+      { percent: 60, color: '#6b1d1d' }, // Darker (60%)
+      { percent: 65, color: '#5a1a1a' }, // Darker (65%)
+      { percent: 70, color: '#4a1818' }, // Darker (70%)
+      { percent: 75, color: '#3d1515' }, // Darker (75%)
+      { percent: 80, color: '#331212' }, // Darker (80%)
+      { percent: 85, color: '#2a0f0f' }, // Darker (85%)
+      { percent: 90, color: '#4a1a3a' }, // Dark red transitioning to purple (90%)
+      { percent: 95, color: '#6b2a5a' }, // Dark purple (95%)
+      { percent: 100, color: '#8b3a7a' }, // Purple (100%)
     ]
     
     // Find the two stops to interpolate between
@@ -261,11 +293,21 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
   const handleQuestionTagToggle = (questionId: number, tagId: number) => {
     const updated = new Map(questionResponses)
     const current = updated.get(questionId) || { freeText: '', selectedTagIds: [] }
-    const tagIds = current.selectedTagIds.includes(tagId)
+    const wasSelected = current.selectedTagIds.includes(tagId)
+    const tagIds = wasSelected
       ? current.selectedTagIds.filter(id => id !== tagId)
       : [...current.selectedTagIds, tagId]
     updated.set(questionId, { ...current, selectedTagIds: tagIds })
     setQuestionResponses(updated)
+    
+    // Update tag statistics in real-time
+    const updatedStats = new Map(tagStatistics)
+    const questionStats = updatedStats.get(questionId) || new Map<number, number>()
+    const currentCount = questionStats.get(tagId) || 0
+    const newCount = wasSelected ? Math.max(0, currentCount - 1) : currentCount + 1
+    questionStats.set(tagId, newCount)
+    updatedStats.set(questionId, questionStats)
+    setTagStatistics(updatedStats)
   }
 
   return (
@@ -274,6 +316,25 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
         <div className="grids-container">
           {/* Train grid with heatmap on the left */}
           <div className="statistics-grid-wrapper">
+            {/* Heatmap Legend - moved above the heatmap */}
+            <div className="heatmap-legend heatmap-legend-above">
+              <h4>Selection Frequency</h4>
+              <div className="heatmap-gradient-bar">
+                <div className="heatmap-gradient-start-indicator"></div>
+                <div
+                  className="heatmap-gradient-fill"
+                  style={{
+                    background: 'linear-gradient(to right, #ffeda0 0%, #fee391 5%, #fec44f 10%, #fe9929 15%, #fe7f00 20%, #f97316 25%, #ec7014 30%, #dc2626 35%, #d94801 40%, #b91c1c 45%, #991b1b 50%, #7f1d1d 55%, #6b1d1d 60%, #5a1a1a 65%, #4a1818 70%, #3d1515 75%, #331212 80%, #2a0f0f 85%, #4a1a3a 90%, #6b2a5a 95%, #8b3a7a 100%)'
+                  }}
+                />
+              </div>
+              <div className="heatmap-legend-labels">
+                <span>0% (transparent)</span>
+                <span>50%</span>
+                <span>100%</span>
+              </div>
+              <p className="heatmap-legend-note">Color intensity represents absolute percentage of users who selected each tile</p>
+            </div>
             <div className="statistics-grid-container">
               <Grid
                 grid={grid}
@@ -299,12 +360,15 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
                     const isUnchosen = isEligible && responseCount === 0
                     const heatmapColor = isEligible ? getHeatmapColor(responseCount) : undefined
                     const isUserSelection = userSelection && userSelection.row === rowIndex && userSelection.col === colIndex
+                    const isDoor = tile.isDoor === true
+                    const isDoorLeft = isDoor && colIndex === 0
+                    const isDoorRight = isDoor && colIndex === grid.width - 1
                     
                     return (
                       <div key={`${rowIndex}-${colIndex}`} className={`statistics-tile-wrapper ${isUserSelection ? 'user-selection-tile' : ''}`}>
                         {isEligible ? (
                           <div 
-                            className={`heatmap-overlay ${isUnchosen ? 'heatmap-unchosen' : ''} ${isUnchosen && isSeat ? 'heatmap-unchosen-seat' : ''} ${isUserSelection ? 'user-selection-highlight' : ''}`}
+                            className={`heatmap-overlay ${isUnchosen ? 'heatmap-unchosen' : ''} ${isUnchosen && isSeat ? 'heatmap-unchosen-seat' : ''} ${isUserSelection ? 'user-selection-highlight' : ''} ${isDoor ? 'heatmap-door' : ''} ${isDoorLeft ? 'heatmap-door-left' : ''} ${isDoorRight ? 'heatmap-door-right' : ''}`}
                             style={{
                               backgroundColor: heatmapColor,
                               cursor: 'pointer',
@@ -316,7 +380,7 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
                           </div>
                         ) : (
                           <div 
-                            className="heatmap-overlay heatmap-ineligible"
+                            className={`heatmap-overlay heatmap-ineligible ${isDoor ? 'heatmap-door' : ''} ${isDoorLeft ? 'heatmap-door-left' : ''} ${isDoorRight ? 'heatmap-door-right' : ''}`}
                             title="Not an eligible choice"
                           />
                         )}
@@ -354,7 +418,6 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
               {/* Questions Section */}
               {questions.length > 0 && (
                 <div className="questions-response-section">
-                  <h3 className="questions-response-title">Questions</h3>
                   {questions.map((question) => {
                     const response = questionResponses.get(question.id) || { freeText: '', selectedTagIds: [] }
                     const isRequired = question.is_required
@@ -368,6 +431,30 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
                           {question.question.question_text}
                           {isRequired && <span className="required-indicator"> *</span>}
                         </label>
+                        {question.question.allows_tags && question.tags.length > 0 && (
+                          <div className="question-tags-selection">
+                            <div className="tags-selection-grid">
+                              {question.tags.map((tag) => {
+                                const tagCount = tagStatistics.get(question.id)?.get(tag.id) || 0
+                                return (
+                                  <label key={tag.id} className="tag-selection-checkbox">
+                                    <input
+                                      type="checkbox"
+                                      checked={response.selectedTagIds.includes(tag.id)}
+                                      onChange={() => handleQuestionTagToggle(question.id, tag.id)}
+                                    />
+                                    <span>
+                                      {tag.tag_text}
+                                      {tagCount > 0 && (
+                                        <span className="tag-count"> ({tagCount})</span>
+                                      )}
+                                    </span>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
                         {question.question.allows_free_text && (
                           <textarea
                             value={response.freeText}
@@ -377,22 +464,6 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
                             rows={3}
                             required={isFreeTextRequired}
                           />
-                        )}
-                        {question.question.allows_tags && question.tags.length > 0 && (
-                          <div className="question-tags-selection">
-                            <div className="tags-selection-grid">
-                              {question.tags.map((tag) => (
-                                <label key={tag.id} className="tag-selection-checkbox">
-                                  <input
-                                    type="checkbox"
-                                    checked={response.selectedTagIds.includes(tag.id)}
-                                    onChange={() => handleQuestionTagToggle(question.id, tag.id)}
-                                  />
-                                  <span>{tag.tag_text}</span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
                         )}
                         {!isValid && (
                           <p className="question-error-message">
@@ -429,36 +500,6 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
               <p><strong>Total Responses:</strong> {statistics.total_responses}</p>
               <p><strong>Seat Selections:</strong> {statistics.seat_selections}</p>
               <p><strong>Floor Selections:</strong> {statistics.floor_selections}</p>
-              
-              {/* Gradient Legend */}
-              <div className="heatmap-legend">
-                <h4>Selection Frequency</h4>
-                <div className="heatmap-gradient-bar">
-                  <div 
-                    className="heatmap-gradient-fill"
-                    style={{
-                      background: `linear-gradient(to right, 
-                        #3b82f6 0%, 
-                        #3b82f6 0.5%,
-                        #ffeda0 0.5%, 
-                        #fee391 5%, 
-                        #fec44f 10%, 
-                        #fe9929 15%, 
-                        #fe7f00 20%, 
-                        #ec7014 30%, 
-                        #d94801 40%, 
-                        #993404 50%, 
-                        #7a2e05 100%)`
-                    }}
-                  />
-                </div>
-                <div className="heatmap-legend-labels">
-                  <span>0%</span>
-                  <span>50%</span>
-                  <span>100%</span>
-                </div>
-                <p className="heatmap-legend-note">Color intensity represents percentage of users who selected each tile</p>
-              </div>
             </div>
           </div>
         </div>
