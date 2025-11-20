@@ -329,7 +329,7 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
                 />
               </div>
               <div className="heatmap-legend-labels">
-                <span>0% (transparent)</span>
+                <span>0%</span>
                 <span>50%</span>
                 <span>100%</span>
               </div>

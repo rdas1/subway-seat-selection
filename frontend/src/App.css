@@ -184,7 +184,8 @@
   margin-left: 0.5rem;
 }
 
-.nav-logout-button {
+.nav-logout-button,
+.nav-login-button {
   background-color: transparent;
   border: 1px solid #565658;
   color: #d7dadc;
@@ -194,12 +195,26 @@
   cursor: pointer;
   transition: all 0.2s;
   margin-left: 0.5rem;
+  text-decoration: none;
+  display: inline-block;
 }
 
-.nav-logout-button:hover {
+.nav-logout-button:hover,
+.nav-login-button:hover {
   background-color: #3a3a3c;
   border-color: #4a90e2;
   color: white;
+}
+
+.nav-login-button {
+  background-color: #4a90e2;
+  border-color: #4a90e2;
+  color: white;
+}
+
+.nav-login-button:hover {
+  background-color: #357abd;
+  border-color: #357abd;
 }
 
 @media (max-width: 768px) {
@@ -263,7 +278,8 @@
     border-bottom: 1px solid #3a3a3c;
   }
 
-  .nav-logout-button {
+  .nav-logout-button,
+  .nav-login-button {
     width: 100%;
     margin: 0;
     padding: 0.75rem 1rem;

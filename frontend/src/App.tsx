@@ -112,13 +112,21 @@ function Navigation() {
               Study
           </Link>
           </div>
-          {user && (
+          {user ? (
             <>
               <span className="nav-user-email">{user.email}</span>
               <button onClick={handleLogout} className="nav-logout-button">
                 Logout
               </button>
             </>
+          ) : (
+            <Link 
+              to="/login" 
+              className="nav-login-button"
+              onClick={closeMobileMenu}
+            >
+              Login
+            </Link>
           )}
         </div>
       </div>
@@ -134,8 +142,9 @@ function App() {
         <Navigation />
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/scenario-editor" element={<ScenarioEditor />} />
+            <Route path="/scenario-editor" element={<ScenarioEditor />} />
             <Route path="/scenario-editor/:id" element={<ScenarioEditor />} />
+            <Route path="/login" element={<VerificationPage />} />
             <Route path="/verify" element={<VerificationPage />} />
             <Route path="/study-builder" element={<StudyBuilder />} />
             <Route path="/study-builder/:id" element={<StudyDetail />} />
