@@ -50,7 +50,7 @@ export default function StudyScenarioPage() {
   // Scroll to top when component mounts
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [])
+  }, [scenarioNum, showResults])
 
   // Load total scenarios count and validate progress
   useEffect(() => {

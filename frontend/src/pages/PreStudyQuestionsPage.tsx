@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { preStudyQuestionApi, PreStudyQuestionResponse, preStudyQuestionResponseApi, PreStudyQuestionResponseCreate, studyApi, StudyResponse } from '../services/api'
+import { preStudyQuestionApi, PreStudyQuestionResponse, preStudyQuestionResponseApi, PreStudyQuestionResponseCreate, studyApi, StudyResponse, studyProgressApi } from '../services/api'
 import { getSessionId } from '../utils/session'
 import { useAuth } from '../contexts/AuthContext'
 import StudyProgressBar from '../components/StudyProgressBar'
@@ -19,6 +19,7 @@ export default function PreStudyQuestionsPage() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState<boolean>(false)
   const [questionResponses, setQuestionResponses] = useState<Map<number, { freeText: string; selectedTagIds: number[] }>>(new Map())
+  const [totalScenarios, setTotalScenarios] = useState<number>(0)
 
   // Load questions and existing responses
   useEffect(() => {
@@ -35,12 +36,17 @@ export default function PreStudyQuestionsPage() {
         
         const sessionId = getSessionId()
         
-        // Load study, questions and existing responses in parallel
-        const [studyData, questionsData, responsesData] = await Promise.all([
+        // Load study, questions, responses, and progress in parallel
+        const [studyData, questionsData, responsesData, progressData] = await Promise.all([
           studyApi.getPublic(studyId).catch(() => null), // Public endpoint for participant view
           preStudyQuestionApi.getAll(studyId),
-          preStudyQuestionResponseApi.getBySession(studyId, sessionId).catch(() => []) // Ignore errors if no responses exist
+          preStudyQuestionResponseApi.getBySession(studyId, sessionId).catch(() => []), // Ignore errors if no responses exist
+          studyProgressApi.getProgress(studyId, sessionId).catch(() => null) // Ignore errors if progress unavailable
         ])
+        
+        if (progressData) {
+          setTotalScenarios(progressData.total_scenarios)
+        }
         
         setStudy(studyData)
         
@@ -189,8 +195,11 @@ export default function PreStudyQuestionsPage() {
               {study.description}
             </p>
           )}
+          <p style={{ color: '#a0a0a0', marginTop: study?.description ? '0.5rem' : '0.5rem', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+            This study involves {totalScenarios} interactive {totalScenarios === 1 ? 'scenario' : 'scenarios'} and {questions.length} or more questions.
+          </p>
           {questions.length > 0 && (
-            <p style={{ color: '#a0a0a0', marginTop: study?.description ? '0.5rem' : '0.5rem', marginBottom: '1.5rem' }}>
+            <p style={{ color: '#a0a0a0', marginTop: '0.5rem', marginBottom: '1.5rem' }}>
               Please answer the following questions before beginning the study.
             </p>
           )}
