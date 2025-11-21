@@ -140,6 +140,13 @@
 
 .statistics-view .agreement-message-pulse {
   animation: agreement-pulse 2s ease-in-out infinite;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.statistics-view .agreement-message-pulse:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 100, 0, 0.3);
 }
 
 @keyframes agreement-pulse {

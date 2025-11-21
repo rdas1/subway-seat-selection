@@ -378,7 +378,12 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
                     const isDoorRight = isDoor && colIndex === grid.width - 1
                     
                     return (
-                      <div key={`${rowIndex}-${colIndex}`} className={`statistics-tile-wrapper ${isUserSelection ? 'user-selection-tile' : ''}`}>
+                      <div 
+                        key={`${rowIndex}-${colIndex}`} 
+                        className={`statistics-tile-wrapper ${isUserSelection ? 'user-selection-tile' : ''}`}
+                        data-tile-row={rowIndex}
+                        data-tile-col={colIndex}
+                      >
                         {isEligible ? (
                           <div 
                             className={`heatmap-overlay ${isUnchosen ? 'heatmap-unchosen' : ''} ${isUnchosen && isSeat ? 'heatmap-unchosen-seat' : ''} ${isUserSelection ? 'user-selection-highlight' : ''} ${isDoor ? 'heatmap-door' : ''} ${isDoorLeft ? 'heatmap-door-left' : ''} ${isDoorRight ? 'heatmap-door-right' : ''}`}
@@ -423,7 +428,18 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
                         <strong>Hot take! You're the first respondent to choose this spot.</strong>
                       </div>
                     )}
-                    <div className="agreement-message agreement-message-percentage agreement-message-pulse">
+                    <div 
+                      className="agreement-message agreement-message-percentage agreement-message-pulse"
+                      onClick={() => {
+                        // Find and scroll to the user-selected tile
+                        const tileElement = document.querySelector(
+                          `.statistics-tile-wrapper[data-tile-row="${userSelection.row}"][data-tile-col="${userSelection.col}"]`
+                        )
+                        if (tileElement) {
+                          tileElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                        }
+                      }}
+                    >
                       <strong>{formattedPercentage}% of all respondents chose this spot.</strong>
                     </div>
                   </>
