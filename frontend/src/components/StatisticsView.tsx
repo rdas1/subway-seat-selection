@@ -436,10 +436,12 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
                             <div className="tags-selection-grid">
                               {question.tags.map((tag) => {
                                 const tagCount = tagStatistics.get(question.id)?.get(tag.id) || 0
+                                const allowsMultiple = question.question.allows_multiple_tags ?? true
                                 return (
-                                  <label key={tag.id} className="tag-selection-checkbox">
+                                  <label key={tag.id} className={allowsMultiple ? "tag-selection-checkbox" : "tag-selection-radio"}>
                                     <input
-                                      type="checkbox"
+                                      type={allowsMultiple ? "checkbox" : "radio"}
+                                      name={`question-${question.id}`}
                                       checked={response.selectedTagIds.includes(tag.id)}
                                       onChange={() => handleQuestionTagToggle(question.id, tag.id)}
                                     />

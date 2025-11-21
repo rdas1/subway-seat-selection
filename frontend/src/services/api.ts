@@ -204,6 +204,16 @@ export const trainConfigApi = {
 
     return response.json();
   },
+
+  async getQuestionResponses(configId: number): Promise<Record<number, QuestionResponseResponse[]>> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/train-configurations/${configId}/question-responses`);
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch question responses');
+    }
+
+    return response.json();
+  },
 };
 
 // User Response API
@@ -558,6 +568,79 @@ export const studyApi = {
   },
 };
 
+// PreStudyQuestion API
+export interface PreStudyQuestionCreate {
+  question_id?: number;
+  question_text?: string;
+  allows_free_text?: boolean;
+  allows_tags?: boolean;
+  allows_multiple_tags?: boolean;
+  order?: number;
+  tag_ids?: number[];
+}
+
+export interface PreStudyQuestionResponse {
+  id: number;
+  question_id: number;
+  study_id: number;
+  order: number;
+  created_at: string;
+  updated_at?: string;
+  question: QuestionResponse;
+  tags: QuestionTagResponse[];
+}
+
+export const preStudyQuestionApi = {
+  async create(studyId: number, question: PreStudyQuestionCreate): Promise<PreStudyQuestionResponse> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${studyId}/pre-study-questions`, {
+      method: 'POST',
+      body: JSON.stringify(question),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to create pre-study question' }));
+      throw new Error(error.detail || 'Failed to create pre-study question');
+    }
+
+    return response.json();
+  },
+
+  async getAll(studyId: number): Promise<PreStudyQuestionResponse[]> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${studyId}/pre-study-questions`);
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch pre-study questions');
+    }
+
+    return response.json();
+  },
+
+  async update(studyId: number, questionId: number, question: PreStudyQuestionCreate): Promise<PreStudyQuestionResponse> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${studyId}/pre-study-questions/${questionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(question),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to update pre-study question' }));
+      throw new Error(error.detail || 'Failed to update pre-study question');
+    }
+
+    return response.json();
+  },
+
+  async delete(studyId: number, questionId: number): Promise<void> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${studyId}/pre-study-questions/${questionId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to delete pre-study question' }));
+      throw new Error(error.detail || 'Failed to delete pre-study question');
+    }
+  },
+};
+
 // Question API
 export interface QuestionTagResponse {
   id: number;
@@ -582,6 +665,7 @@ export interface PostResponseQuestionResponse {
     question_text: string;
     allows_free_text: boolean;
     allows_tags: boolean;
+    allows_multiple_tags: boolean;
     created_at: string;
     updated_at?: string;
   };
@@ -595,6 +679,7 @@ export interface PostResponseQuestionCreate {
   free_text_required?: boolean;
   allows_free_text?: boolean;
   allows_tags?: boolean;
+  allows_multiple_tags?: boolean;
   order?: number;
   tag_ids?: number[];
 }

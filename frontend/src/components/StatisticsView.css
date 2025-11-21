@@ -507,30 +507,34 @@
     gap: 0.75rem;
   }
   
-  .tag-selection-checkbox {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    background-color: #3a3a3c;
-    border: 1px solid #565658;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s;
-    color: #d7dadc;
-    font-size: 0.9rem;
-  }
-  
-  .tag-selection-checkbox:hover {
-    background-color: #4a4a4c;
-    border-color: #4a90e2;
-  }
-  
-  .tag-selection-checkbox input[type="checkbox"] {
-    cursor: pointer;
-  }
-  
-.tag-selection-checkbox input[type="checkbox"]:checked + span {
+.tag-selection-checkbox,
+.tag-selection-radio {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background-color: #3a3a3c;
+  border: 1px solid #565658;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #d7dadc;
+  font-size: 0.9rem;
+}
+
+.tag-selection-checkbox:hover,
+.tag-selection-radio:hover {
+  background-color: #4a4a4c;
+  border-color: #4a90e2;
+}
+
+.tag-selection-checkbox input[type="checkbox"],
+.tag-selection-radio input[type="radio"] {
+  cursor: pointer;
+}
+
+.tag-selection-checkbox input[type="checkbox"]:checked + span,
+.tag-selection-radio input[type="radio"]:checked + span {
   color: #4a90e2;
   font-weight: 600;
 }

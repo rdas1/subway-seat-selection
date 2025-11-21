@@ -155,6 +155,8 @@ class Study(Base):
     # Relationships
     scenario_group = relationship("ScenarioGroup", back_populates="studies")
     created_by_user = relationship("User", back_populates="created_studies", foreign_keys=[created_by_user_id])
+    pre_study_questions = relationship("PreStudyQuestion", back_populates="study", cascade="all, delete-orphan")
+    post_study_questions = relationship("PostStudyQuestion", back_populates="study", cascade="all, delete-orphan")
 
 
 class Question(Base):
@@ -167,11 +169,14 @@ class Question(Base):
     question_text = Column(String, nullable=False)
     allows_free_text = Column(Boolean, nullable=False, default=True)
     allows_tags = Column(Boolean, nullable=False, default=True)
+    allows_multiple_tags = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # Relationships
     post_response_questions = relationship("PostResponseQuestion", back_populates="question", cascade="all, delete-orphan")
+    pre_study_questions = relationship("PreStudyQuestion", back_populates="question", cascade="all, delete-orphan")
+    post_study_questions = relationship("PostStudyQuestion", back_populates="question", cascade="all, delete-orphan")
     tag_assignments = relationship("QuestionTagAssignment", back_populates="question", cascade="all, delete-orphan")
 
 
@@ -199,6 +204,52 @@ class PostResponseQuestion(Base):
     # Unique constraint to prevent duplicate question assignments
     __table_args__ = (
         UniqueConstraint('question_id', 'train_configuration_id', name='uq_post_response_question'),
+    )
+
+
+class PreStudyQuestion(Base):
+    """
+    Model for storing pre-study questions linked to studies.
+    """
+    __tablename__ = "pre_study_questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False, index=True)
+    study_id = Column(Integer, ForeignKey("studies.id"), nullable=False, index=True)
+    order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    question = relationship("Question", back_populates="pre_study_questions")
+    study = relationship("Study", back_populates="pre_study_questions")
+    
+    # Unique constraint to prevent duplicate question assignments
+    __table_args__ = (
+        UniqueConstraint('question_id', 'study_id', name='uq_pre_study_question'),
+    )
+
+
+class PostStudyQuestion(Base):
+    """
+    Model for storing post-study questions linked to studies.
+    """
+    __tablename__ = "post_study_questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False, index=True)
+    study_id = Column(Integer, ForeignKey("studies.id"), nullable=False, index=True)
+    order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    question = relationship("Question", back_populates="post_study_questions")
+    study = relationship("Study", back_populates="post_study_questions")
+    
+    # Unique constraint to prevent duplicate question assignments
+    __table_args__ = (
+        UniqueConstraint('question_id', 'study_id', name='uq_post_study_question'),
     )
 
 

@@ -1,10 +1,45 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { studyApi, StudyResponse, trainConfigApi, scenarioGroupApi, PostResponseQuestionResponse, PostResponseQuestionCreate, questionApi, TagLibraryResponse } from '../services/api'
+import { studyApi, StudyResponse, trainConfigApi, scenarioGroupApi, PostResponseQuestionResponse, PostResponseQuestionCreate, questionApi, TagLibraryResponse, QuestionResponseResponse, TrainConfigurationResponse, preStudyQuestionApi, PreStudyQuestionResponse, PreStudyQuestionCreate } from '../services/api'
 import { Tile } from '../types/grid'
 import { useAuth } from '../contexts/AuthContext'
 import { formatRelativeTime } from '../utils/time'
+import { SubwayGrid } from '../classes/SubwayGrid'
+import StatisticsView from '../components/StatisticsView'
 import './StudyDetail.css'
+
+// Helper function to calculate grid stats from tiles
+function calculateGridStatsFromTiles(tiles: Tile[][]): { capacity: number; menPercent: number; womenPercent: number } {
+  let totalEligible = 0
+  let occupied = 0
+  let men = 0
+  let women = 0
+
+  for (const row of tiles) {
+    for (const tile of row) {
+      if (!tile) continue
+      
+      // Count eligible tiles (seats and floor, not barriers, doors, or stanchions)
+      if (tile.type !== 'barrier' && !tile.isDoor && !tile.isStanchion) {
+        totalEligible++
+        if (tile.occupied) {
+          occupied++
+          if (tile.person === 'man') men++
+          else if (tile.person === 'woman') women++
+        }
+      }
+    }
+  }
+
+  const capacity = totalEligible > 0 ? Math.round((occupied / totalEligible) * 100) : 0
+  
+  // Calculate percentages based only on men and women (exclude neutral)
+  const menAndWomen = men + women
+  const menPercent = menAndWomen > 0 ? Math.round((men / menAndWomen) * 100) : 50
+  const womenPercent = menAndWomen > 0 ? Math.round((women / menAndWomen) * 100) : 50
+
+  return { capacity, menPercent, womenPercent }
+}
 
 export default function StudyDetail() {
   const { id } = useParams<{ id: string }>()
@@ -24,6 +59,22 @@ export default function StudyDetail() {
   const [editingQuestion, setEditingQuestion] = useState<{ scenarioId: number; question: PostResponseQuestionResponse } | null>(null)
   const [showTagLibrary, setShowTagLibrary] = useState<boolean>(false)
   const [tagLibrary, setTagLibrary] = useState<TagLibraryResponse | null>(null)
+  const [responseCounts, setResponseCounts] = useState<Map<number, number>>(new Map())
+  const [loadingResponseCounts, setLoadingResponseCounts] = useState<boolean>(false)
+  const [viewingResponses, setViewingResponses] = useState<{ scenarioId: number; scenario: TrainConfigurationResponse } | null>(null)
+  const [questionResponses, setQuestionResponses] = useState<Record<number, QuestionResponseResponse[]>>({})
+  const [loadingQuestionResponses, setLoadingQuestionResponses] = useState<boolean>(false)
+  const [statistics, setStatistics] = useState<{
+    total_responses: number
+    seat_selections: number
+    floor_selections: number
+    selection_heatmap: Record<string, number>
+  } | null>(null)
+  const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set())
+  const [preStudyQuestions, setPreStudyQuestions] = useState<PreStudyQuestionResponse[]>([])
+  const [loadingPreStudyQuestions, setLoadingPreStudyQuestions] = useState<boolean>(false)
+  const [editingPreStudyQuestion, setEditingPreStudyQuestion] = useState<PreStudyQuestionResponse | null>(null)
+  const [preStudyQuestionsExpanded, setPreStudyQuestionsExpanded] = useState<boolean>(true)
   const titleDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const descriptionDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -197,6 +248,67 @@ export default function StudyDetail() {
     }
   }
 
+  // Pre-study question handlers
+  const handleCreatePreStudyQuestion = async (questionData: PreStudyQuestionCreate) => {
+    if (!study?.id) return
+    
+    if (!questionData.question_text || !questionData.question_text.trim()) {
+      setError('Question text is required')
+      return
+    }
+    
+    try {
+      const created = await preStudyQuestionApi.create(study.id, {
+        question_text: questionData.question_text,
+        allows_free_text: questionData.allows_free_text ?? true,
+        allows_tags: questionData.allows_tags ?? true,
+        order: preStudyQuestions.length,
+        tag_ids: questionData.tag_ids ?? []
+      })
+      setPreStudyQuestions([...preStudyQuestions, created])
+      setEditingPreStudyQuestion(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create pre-study question')
+    }
+  }
+
+  const handleUpdatePreStudyQuestion = async (questionId: number, updates: Partial<PreStudyQuestionCreate>) => {
+    if (!study?.id) return
+    
+    const question = preStudyQuestions.find(q => q.id === questionId)
+    if (!question) return
+    
+    const updateData: PreStudyQuestionCreate = {
+      question_text: updates.question_text ?? question.question.question_text,
+      allows_free_text: updates.allows_free_text ?? question.question.allows_free_text,
+      allows_tags: updates.allows_tags ?? question.question.allows_tags,
+      order: updates.order ?? question.order,
+      tag_ids: updates.tag_ids ?? question.tags.map(t => t.id)
+    }
+    
+    try {
+      const updated = await preStudyQuestionApi.update(study.id, questionId, updateData)
+      setPreStudyQuestions(preStudyQuestions.map(q => q.id === questionId ? updated : q))
+      setEditingPreStudyQuestion(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update pre-study question')
+    }
+  }
+
+  const handleDeletePreStudyQuestion = async (questionId: number) => {
+    if (!study?.id) return
+    
+    try {
+      await preStudyQuestionApi.delete(study.id, questionId)
+      setPreStudyQuestions(preStudyQuestions.filter(q => q.id !== questionId))
+      if (editingPreStudyQuestion?.id === questionId) {
+        setEditingPreStudyQuestion(null)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete pre-study question')
+    }
+  }
+
   const handleAddTagsToQuestion = async (scenarioId: number, questionId: number, selectedTagIds: number[]) => {
     const question = questions.get(scenarioId)?.find(q => q.id === questionId)
     if (!question) return
@@ -219,6 +331,43 @@ export default function StudyDetail() {
       setError(err instanceof Error ? err.message : 'Failed to create tag')
       throw err
     }
+  }
+
+  const handleViewResponses = async (scenarioId: number, scenario: TrainConfigurationResponse) => {
+    setViewingResponses({ scenarioId, scenario })
+    setLoadingQuestionResponses(true)
+    setError(null)
+    
+    try {
+      // Load statistics
+      const stats = await trainConfigApi.getStatistics(scenarioId)
+      setStatistics(stats)
+      
+      // Load question responses
+      const responses = await trainConfigApi.getQuestionResponses(scenarioId)
+      setQuestionResponses(responses)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load responses')
+    } finally {
+      setLoadingQuestionResponses(false)
+    }
+  }
+
+  const handleCloseResponsesView = () => {
+    setViewingResponses(null)
+    setQuestionResponses({})
+    setStatistics(null)
+    setExpandedQuestions(new Set())
+  }
+
+  const toggleQuestionExpansion = (questionId: number) => {
+    const newExpanded = new Set(expandedQuestions)
+    if (newExpanded.has(questionId)) {
+      newExpanded.delete(questionId)
+    } else {
+      newExpanded.add(questionId)
+    }
+    setExpandedQuestions(newExpanded)
   }
 
   // Handle creating a new scenario
@@ -389,6 +538,55 @@ export default function StudyDetail() {
     }
   }, [study?.scenario_group?.items])
 
+  // Load pre-study questions
+  useEffect(() => {
+    if (study?.id) {
+      const loadPreStudyQuestions = async () => {
+        setLoadingPreStudyQuestions(true)
+        try {
+          const questions = await preStudyQuestionApi.getAll(study.id)
+          setPreStudyQuestions(questions)
+        } catch (err) {
+          console.error('Failed to load pre-study questions:', err)
+          setError(err instanceof Error ? err.message : 'Failed to load pre-study questions')
+        } finally {
+          setLoadingPreStudyQuestions(false)
+        }
+      }
+      loadPreStudyQuestions()
+    } else {
+      setPreStudyQuestions([])
+    }
+  }, [study?.id])
+
+  // Load response counts for all scenarios in the study
+  useEffect(() => {
+    if (study?.scenario_group?.items) {
+      const loadAllResponseCounts = async () => {
+        setLoadingResponseCounts(true)
+        const countsMap = new Map<number, number>()
+        
+        for (const item of study.scenario_group.items) {
+          if (item.train_configuration) {
+            try {
+              const stats = await trainConfigApi.getStatistics(item.train_configuration.id)
+              countsMap.set(item.train_configuration.id, stats.total_responses || 0)
+            } catch (err) {
+              console.error(`Failed to load response count for scenario ${item.train_configuration.id}:`, err)
+              countsMap.set(item.train_configuration.id, 0)
+            }
+          }
+        }
+        
+        setResponseCounts(countsMap)
+        setLoadingResponseCounts(false)
+      }
+      loadAllResponseCounts()
+    } else {
+      setResponseCounts(new Map())
+    }
+  }, [study?.scenario_group?.items])
+
   // Load tag library when needed
   useEffect(() => {
     if (showTagLibrary && !tagLibrary) {
@@ -475,6 +673,163 @@ export default function StudyDetail() {
           rows={1}
         />
         
+        {/* Pre-Study Questions Section */}
+        {study && (
+          <div className="pre-study-questions-section">
+            <div className="section-header" onClick={() => setPreStudyQuestionsExpanded(!preStudyQuestionsExpanded)}>
+              <h2 className="section-title">Pre-Study Questions</h2>
+              <button className="section-toggle" aria-label={preStudyQuestionsExpanded ? 'Collapse' : 'Expand'}>
+                {preStudyQuestionsExpanded ? '−' : '+'}
+              </button>
+            </div>
+            {preStudyQuestionsExpanded && (
+              <>
+                {error && (
+                  <div className="error-message" style={{ marginBottom: '1rem' }}>
+                    <p>{error}</p>
+                  </div>
+                )}
+                <div className="pre-study-questions-grid">
+                  {/* Create new question card */}
+                  <div 
+                    className="pre-study-question-card pre-study-question-card-create"
+                    onClick={() => {
+                      const newQuestion: PreStudyQuestionResponse = {
+                        id: -1,
+                        question_id: -1,
+                        study_id: study.id,
+                        order: preStudyQuestions.length,
+                        created_at: new Date().toISOString(),
+                        question: {
+                          id: -1,
+                          question_text: 'What is your age range?',
+                          allows_free_text: true,
+                          allows_tags: true,
+                          created_at: new Date().toISOString()
+                        },
+                        tags: []
+                      }
+                      setEditingPreStudyQuestion(newQuestion)
+                    }}
+                  >
+                    <div className="pre-study-question-card-content">
+                      <div className="pre-study-question-card-plus">+</div>
+                      <h3>Create New Question</h3>
+                    </div>
+                  </div>
+                  {/* Existing questions */}
+                  {loadingPreStudyQuestions ? (
+                    <div className="loading-message">Loading questions...</div>
+                  ) : (
+                    preStudyQuestions.map((question) => (
+                      <div key={question.id} className="pre-study-question-card">
+                        <button
+                          className="pre-study-question-card-delete"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (confirm(`Are you sure you want to delete this question?`)) {
+                              handleDeletePreStudyQuestion(question.id)
+                            }
+                          }}
+                          aria-label="Delete question"
+                        >
+                          ×
+                        </button>
+                        <div 
+                          className="pre-study-question-card-content"
+                          onClick={() => setEditingPreStudyQuestion(question)}
+                        >
+                          <h3>{question.question.question_text}</h3>
+                          {question.tags.length > 0 && (
+                            <div className="pre-study-question-tags">
+                              {question.tags.map(tag => (
+                                <span key={tag.id} className="tag-badge">{tag.tag_text}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                {/* Question Editor Modal */}
+                {editingPreStudyQuestion && (
+                  <div className="question-editor-modal-overlay" onClick={() => setEditingPreStudyQuestion(null)}>
+                    <div className="question-editor-modal" onClick={(e) => e.stopPropagation()}>
+                      <div className="question-editor-header">
+                        <h3>{editingPreStudyQuestion.id === -1 ? 'Create Question' : 'Edit Question'}</h3>
+                      </div>
+                      <PreStudyQuestionEditor
+                        question={editingPreStudyQuestion}
+                        onSave={editingPreStudyQuestion.id === -1 ? handleCreatePreStudyQuestion : (updates) => handleUpdatePreStudyQuestion(editingPreStudyQuestion.id, updates)}
+                        onCancel={() => setEditingPreStudyQuestion(null)}
+                        onAddTags={async () => {
+                          const library = await questionApi.getTagLibrary()
+                          setTagLibrary(library)
+                          setShowTagLibrary(true)
+                        }}
+                        tagLibrary={tagLibrary}
+                        showTagLibrary={showTagLibrary}
+                        onCloseTagLibrary={() => setShowTagLibrary(false)}
+                        onCreateTag={handleCreateNewTag}
+                        onSelectTags={async (tagIds: number[]) => {
+                          if (editingPreStudyQuestion) {
+                            if (editingPreStudyQuestion.id === -1) {
+                              // For new questions, update local state
+                              // If tagIds is a subset (removal), filter; otherwise merge
+                              const currentTagIds = editingPreStudyQuestion.tags.map(t => t.id)
+                              const isRemoval = tagIds.length < currentTagIds.length
+                              let newTags
+                              if (isRemoval) {
+                                // Tag removal - use the provided tagIds directly
+                                // We need to get the tag objects from tagLibrary
+                                if (tagLibrary) {
+                                  const allTags = [...tagLibrary.default_tags, ...tagLibrary.your_tags, ...tagLibrary.community_tags]
+                                  newTags = tagIds.map(id => {
+                                    const tag = allTags.find(t => t.id === id)
+                                    return tag || { id, tag_text: '', is_default: false, created_at: new Date().toISOString() }
+                                  })
+                                } else {
+                                  newTags = editingPreStudyQuestion.tags.filter(t => tagIds.includes(t.id))
+                                }
+                              } else {
+                                // Tag addition - merge
+                                const newTagIds = [...new Set([...currentTagIds, ...tagIds])]
+                                if (tagLibrary) {
+                                  const allTags = [...tagLibrary.default_tags, ...tagLibrary.your_tags, ...tagLibrary.community_tags]
+                                  newTags = newTagIds.map(id => {
+                                    const existingTag = editingPreStudyQuestion.tags.find(t => t.id === id)
+                                    if (existingTag) return existingTag
+                                    const tag = allTags.find(t => t.id === id)
+                                    return tag || { id, tag_text: '', is_default: false, created_at: new Date().toISOString() }
+                                  })
+                                } else {
+                                  newTags = editingPreStudyQuestion.tags
+                                }
+                              }
+                              setEditingPreStudyQuestion({
+                                ...editingPreStudyQuestion,
+                                tags: newTags
+                              })
+                            } else {
+                              // For existing questions, update via API
+                              const currentTagIds = editingPreStudyQuestion.tags.map(t => t.id)
+                              const isRemoval = tagIds.length < currentTagIds.length
+                              const newTagIds = isRemoval ? tagIds : [...new Set([...currentTagIds, ...tagIds])]
+                              await handleUpdatePreStudyQuestion(editingPreStudyQuestion.id, { tag_ids: newTagIds })
+                            }
+                            setShowTagLibrary(false)
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+        
         {/* Scenarios Section */}
         {study.scenario_group && (
           <div className="scenarios-section">
@@ -503,28 +858,121 @@ export default function StudyDetail() {
               {study.scenario_group.items?.map((item: any) => {
                 const scenario = item.train_configuration
                 if (!scenario) return null
-                const scenarioName = scenario.name || `Scenario ${scenario.id}`
+                const scenarioDisplayName = scenario.title || scenario.name || 'Untitled Scenario'
+                const scenarioId = scenario.id
+                const scenarioQuestions = questions.get(scenarioId) || []
                 return (
                   <div 
                     key={item.id} 
                     className="scenario-card"
-                    onClick={() => navigate(`/scenario-editor/${scenario.id}?studyId=${study.id}`)}
                   >
                     <button
                       className="scenario-card-delete"
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleDeleteScenario(item.id, scenarioName)
+                        handleDeleteScenario(item.id, scenarioDisplayName)
                       }}
                       aria-label="Delete scenario"
                     >
                       ×
                     </button>
-                    <div className="scenario-card-content">
-                      <h3>{scenarioName}</h3>
-                      <p className="scenario-card-info">
-                        {scenario.height} × {scenario.width} grid
-                      </p>
+                    <div 
+                      className="scenario-card-content"
+                      onClick={() => navigate(`/scenario-editor/${scenario.id}?studyId=${study.id}`)}
+                    >
+                      <h3>{scenarioDisplayName}</h3>
+                      <div className="scenario-card-info-section">
+                        <div className="scenario-card-info-row">
+                          <p className="scenario-card-info">
+                            {scenario.height} × {scenario.width} grid
+                          </p>
+                          {loadingResponseCounts ? (
+                            <p className="scenario-card-response-count">Loading...</p>
+                          ) : (
+                            <p className="scenario-card-response-count">
+                              {responseCounts.get(scenarioId) || 0} {responseCounts.get(scenarioId) === 1 ? 'response' : 'responses'}
+                            </p>
+                          )}
+                        </div>
+                        {(() => {
+                          const stats = calculateGridStatsFromTiles(scenario.tiles as Tile[][])
+                          return (
+                            <p className="scenario-card-stats">
+                              Capacity: {stats.capacity}% • Men: {stats.menPercent}% • Women: {stats.womenPercent}%
+                            </p>
+                          )
+                        })()}
+                      </div>
+                    </div>
+                    <div className="scenario-card-actions" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigate(`/scenario/${scenarioId}`)
+                        }}
+                        className="scenario-card-preview-button"
+                      >
+                        Preview Scenario
+                      </button>
+                    </div>
+                    <div className="scenario-card-questions" onClick={(e) => e.stopPropagation()}>
+                      <div className="scenario-card-questions-header">
+                        <h4>Questions</h4>
+                        <div className="scenario-card-questions-actions">
+                          <button
+                            onClick={() => handleViewResponses(scenarioId, scenario)}
+                            className="scenario-card-view-responses-button"
+                          >
+                            View Responses
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigate(`/scenario-editor/${scenarioId}?studyId=${study.id}&addQuestion=true`)
+                            }}
+                            className="scenario-card-create-question-button"
+                          >
+                            + Add Question
+                          </button>
+                        </div>
+                      </div>
+                      {loadingQuestions ? (
+                        <p className="scenario-card-questions-loading">Loading questions...</p>
+                      ) : scenarioQuestions.length > 0 ? (
+                        <div className="scenario-card-questions-list">
+                          {scenarioQuestions.map((question) => (
+                            <div key={question.id} className="scenario-card-question-item">
+                              <div className="scenario-card-question-header">
+                                <span className="scenario-card-question-text">{question.question.question_text}</span>
+                                <div className="scenario-card-question-badges">
+                                  {question.is_default && <span className="default-badge">Default</span>}
+                                  {question.is_required && <span className="required-badge">Required</span>}
+                                </div>
+                              </div>
+                              <div className="scenario-card-question-info">
+                                <span>{question.tags.length} tag{question.tags.length !== 1 ? 's' : ''}</span>
+                                {question.question.allows_free_text && <span>Free text</span>}
+                              </div>
+                              <div className="scenario-card-question-actions">
+                                <button
+                                  onClick={() => setEditingQuestion({ scenarioId, question })}
+                                  className="scenario-card-edit-question-button"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteQuestion(scenarioId, question.id)}
+                                  className="scenario-card-delete-question-button"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="scenario-card-questions-empty">No questions yet</p>
+                      )}
                     </div>
                   </div>
                 )
@@ -533,71 +981,6 @@ export default function StudyDetail() {
           </div>
         )}
 
-        {/* Questions Section */}
-        <div className="study-questions-section">
-          <h2 className="study-questions-section-title">Questions asked after each scenario</h2>
-          {loadingQuestions ? (
-            <p>Loading questions...</p>
-          ) : study.scenario_group?.items && study.scenario_group.items.length > 0 ? (
-            <div className="study-questions-content">
-              {Array.from(questions.entries()).map(([scenarioId, scenarioQuestions]) => {
-                const scenarioItem = study.scenario_group?.items?.find(
-                  (item: any) => item.train_configuration?.id === scenarioId
-                )
-                const scenarioName = scenarioItem?.train_configuration?.name || 
-                                   `Scenario ${scenarioItem?.train_configuration?.id || scenarioId}`
-                
-                return (
-                  <div key={scenarioId} className="scenario-questions-group">
-                    <h3 className="scenario-questions-group-title">{scenarioName}</h3>
-                    <div className="questions-list">
-                      {scenarioQuestions.map((question) => (
-                        <div key={question.id} className="question-card">
-                          <div className="question-card-header">
-                            <h4>{question.question.question_text}</h4>
-                            {question.is_default && <span className="default-badge">Default</span>}
-                            {question.is_required && <span className="required-badge">Required</span>}
-                          </div>
-                          <div className="question-card-content">
-                            <div className="question-info">
-                              <span>Tags: {question.tags.length}</span>
-                              {question.question.allows_free_text && <span>Free text allowed</span>}
-                            </div>
-                            <div className="question-actions">
-                              <button
-                                onClick={() => setEditingQuestion({ scenarioId, question })}
-                                className="edit-question-button"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDeleteQuestion(scenarioId, question.id)}
-                                className="delete-question-button"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => handleCreateQuestion(scenarioId)}
-                      className="create-question-button"
-                    >
-                      + Create Question
-                    </button>
-                  </div>
-                )
-              })}
-              {questions.size === 0 && (
-                <p className="no-questions-message">No questions yet. Create questions for scenarios above.</p>
-              )}
-            </div>
-          ) : (
-            <p className="no-scenarios-message">Add scenarios to create questions.</p>
-          )}
-        </div>
       </div>
       {/* Delete Confirmation Dialog */}
       {deleteConfirmItem && (
@@ -659,6 +1042,106 @@ export default function StudyDetail() {
               onCancel={() => setEditingQuestion(null)}
               onAddTags={() => setShowTagLibrary(true)}
             />
+          </div>
+        </div>
+      )}
+
+      {/* View Responses Modal */}
+      {viewingResponses && (
+        <div className="view-responses-overlay" onClick={handleCloseResponsesView}>
+          <div className="view-responses-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="view-responses-header">
+              <h2>Responses: {viewingResponses.scenario.title || viewingResponses.scenario.name || 'Untitled Scenario'}</h2>
+              <button onClick={handleCloseResponsesView} className="close-modal">×</button>
+            </div>
+            {loadingQuestionResponses ? (
+              <div className="view-responses-loading">Loading responses...</div>
+            ) : (
+              <div className="view-responses-content">
+                <div className="view-responses-heatmap">
+                  {statistics && (() => {
+                    const grid = new SubwayGrid(
+                      viewingResponses.scenario.height,
+                      viewingResponses.scenario.width,
+                      viewingResponses.scenario.tiles as any
+                    )
+                    return (
+                      <StatisticsView
+                        grid={grid}
+                        scenarioId={viewingResponses.scenarioId}
+                        statistics={statistics}
+                        onStatisticsUpdate={setStatistics}
+                        userSelection={null}
+                        userResponseId={undefined}
+                      />
+                    )
+                  })()}
+                </div>
+                <div className="view-responses-panel">
+                  <h3>Question Responses</h3>
+                  {(() => {
+                    const scenarioQuestions = questions.get(viewingResponses.scenarioId) || []
+                    if (scenarioQuestions.length === 0) {
+                      return <p className="no-responses-message">No questions for this scenario.</p>
+                    }
+                    return (
+                      <div className="question-responses-list">
+                        {scenarioQuestions.map((question) => {
+                          const responses = questionResponses[question.id] || []
+                          const isExpanded = expandedQuestions.has(question.id)
+                          const INITIAL_DISPLAY = 5
+                          const displayedResponses = isExpanded ? responses : responses.slice(0, INITIAL_DISPLAY)
+                          const hasMore = responses.length > INITIAL_DISPLAY
+                          
+                          return (
+                            <div key={question.id} className="question-response-group">
+                              <h4 className="question-response-title">{question.question.question_text}</h4>
+                              {responses.length === 0 ? (
+                                <p className="no-responses-message">No responses yet.</p>
+                              ) : (
+                                <>
+                                  <div className="question-response-items">
+                                    {displayedResponses.map((response) => (
+                                      <div key={response.id} className="question-response-item">
+                                        {response.free_text_response && (
+                                          <div className="response-free-text">
+                                            {response.free_text_response}
+                                          </div>
+                                        )}
+                                        {response.selected_tags.length > 0 && (
+                                          <div className="response-tags">
+                                            {response.selected_tags.map((tag) => (
+                                              <span key={tag.id} className="response-tag">
+                                                {tag.tag_text}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        )}
+                                        {!response.free_text_response && response.selected_tags.length === 0 && (
+                                          <div className="response-empty">No response provided</div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                  {hasMore && (
+                                    <button
+                                      onClick={() => toggleQuestionExpansion(question.id)}
+                                      className="view-more-button"
+                                    >
+                                      {isExpanded ? 'Show Less' : `View More (${responses.length - INITIAL_DISPLAY} more)`}
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })()}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -779,6 +1262,158 @@ function StudyTagLibraryModal({
       </div>
     </div>
   );
+}
+
+// PreStudyQuestion Editor Component
+function PreStudyQuestionEditor({
+  question,
+  onSave,
+  onCancel,
+  onAddTags,
+  tagLibrary,
+  showTagLibrary,
+  onCloseTagLibrary,
+  onCreateTag,
+  onSelectTags
+}: {
+  question: PreStudyQuestionResponse;
+  onSave: (updates: PreStudyQuestionCreate) => void;
+  onCancel: () => void;
+  onAddTags: () => void;
+  tagLibrary?: TagLibraryResponse | null;
+  showTagLibrary?: boolean;
+  onCloseTagLibrary?: () => void;
+  onCreateTag?: (tagText: string) => Promise<any>;
+  onSelectTags?: (tagIds: number[]) => void;
+}) {
+  const [questionText, setQuestionText] = useState(question.question.question_text)
+  const [allowsFreeText, setAllowsFreeText] = useState(question.question.allows_free_text)
+  const [allowsTags, setAllowsTags] = useState(question.question.allows_tags)
+  const [allowsMultipleTags, setAllowsMultipleTags] = useState(question.question.allows_multiple_tags ?? true)
+  
+  const isNewQuestion = question.id === -1
+  
+  const handleSave = () => {
+    const updates: PreStudyQuestionCreate = {
+      question_text: questionText,
+      allows_free_text: allowsFreeText,
+      allows_tags: allowsTags,
+      allows_multiple_tags: allowsTags ? allowsMultipleTags : true,
+      tag_ids: question.tags.map(t => t.id)
+    }
+    onSave(updates)
+  }
+  
+  return (
+    <div className="question-editor-content">
+      <div className="form-group">
+        <label>Question Text</label>
+        <input
+          type="text"
+          value={questionText}
+          onChange={(e) => setQuestionText(e.target.value)}
+          placeholder="Enter question text"
+        />
+      </div>
+      <div className="form-group">
+        <label>
+          <input
+            type="checkbox"
+            checked={allowsFreeText}
+            onChange={(e) => setAllowsFreeText(e.target.checked)}
+          />
+          Allow free text response
+        </label>
+      </div>
+      <div className="form-group">
+        <label>
+          <input
+            type="checkbox"
+            checked={allowsTags}
+            onChange={(e) => {
+              setAllowsTags(e.target.checked)
+              if (!e.target.checked) {
+                setAllowsMultipleTags(true) // Reset to default when tags disabled
+              }
+            }}
+          />
+          Allow tag selection
+        </label>
+      </div>
+      {allowsTags && (
+        <div className="form-group">
+          <label>
+            <input
+              type="checkbox"
+              checked={allowsMultipleTags}
+              onChange={(e) => setAllowsMultipleTags(e.target.checked)}
+            />
+            Allow multiple tag selection
+          </label>
+        </div>
+      )}
+      {allowsTags && (
+        <div className="form-group">
+          {question.tags.length > 0 && (
+            <div className="question-tags">
+              <label>Tags</label>
+              <div className="tags-list">
+                {question.tags.map((tag) => (
+                  <span key={tag.id} className="tag-badge">
+                    {tag.tag_text}
+                    {question.id !== -1 && onSelectTags && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          const currentTagIds = question.tags.map(t => t.id)
+                          const newTagIds = currentTagIds.filter(id => id !== tag.id)
+                          await onSelectTags(newTagIds)
+                        }}
+                        className="tag-remove"
+                        aria-label="Remove tag"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          <button onClick={onAddTags} className="add-tags-button">
+            {question.tags.length > 0 ? 'Add More Tags' : 'Add Tags'}
+          </button>
+        </div>
+      )}
+      <div className="question-editor-actions">
+        <button onClick={onCancel} className="cancel-button">Cancel</button>
+        <button 
+          onClick={handleSave} 
+          className="save-button"
+          disabled={isNewQuestion && !questionText.trim()}
+        >
+          {isNewQuestion ? 'Create' : 'Save'}
+        </button>
+      </div>
+      {showTagLibrary && tagLibrary && onSelectTags && onCreateTag && onCloseTagLibrary && (
+        <div className="tag-library-modal-overlay" onClick={onCloseTagLibrary}>
+          <div className="tag-library-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="tag-library-header">
+              <h3>Select Tags</h3>
+              <button onClick={onCloseTagLibrary} className="close-button">×</button>
+            </div>
+            <StudyTagLibraryModal
+              library={tagLibrary}
+              currentTagIds={question.tags.map(t => t.id)}
+              onSelectTags={onSelectTags}
+              onCreateTag={onCreateTag}
+              onClose={onCloseTagLibrary}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // Question Editor Component for Study Detail

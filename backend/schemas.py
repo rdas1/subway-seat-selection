@@ -179,6 +179,7 @@ class QuestionCreate(BaseModel):
     question_text: str = Field(..., description="The question text")
     allows_free_text: bool = Field(True, description="Whether the question allows free text responses")
     allows_tags: bool = Field(True, description="Whether the question allows tag selection")
+    allows_multiple_tags: bool = Field(True, description="Whether the question allows multiple tag selection (only valid if allows_tags is True)")
 
 
 class QuestionResponse(BaseModel):
@@ -186,6 +187,7 @@ class QuestionResponse(BaseModel):
     question_text: str
     allows_free_text: bool
     allows_tags: bool
+    allows_multiple_tags: bool
     created_at: datetime
     updated_at: Optional[datetime]
 
@@ -265,4 +267,29 @@ class TagLibraryResponse(BaseModel):
     default_tags: List[QuestionTagResponse] = []
     your_tags: List[QuestionTagResponse] = []
     community_tags: List[QuestionTagResponse] = []
+
+
+# PreStudyQuestion Schemas
+class PreStudyQuestionCreate(BaseModel):
+    question_id: Optional[int] = Field(None, description="ID of existing question to link (if not provided, question_text must be provided)")
+    question_text: Optional[str] = Field(None, description="Text for new question (required if question_id is not provided)")
+    allows_free_text: bool = Field(True, description="Whether the question allows free text (only used when creating new Question)")
+    allows_tags: bool = Field(True, description="Whether the question allows tags (only used when creating new Question)")
+    allows_multiple_tags: bool = Field(True, description="Whether the question allows multiple tag selection (only used when creating new Question, only valid if allows_tags is True)")
+    order: int = Field(0, description="Order position for the question")
+    tag_ids: Optional[List[int]] = Field(default=[], description="List of tag IDs to assign to the question")
+
+
+class PreStudyQuestionResponse(BaseModel):
+    id: int
+    question_id: int
+    study_id: int
+    order: int
+    created_at: datetime
+    updated_at: Optional[datetime]
+    question: QuestionResponse
+    tags: List[QuestionTagResponse] = []
+
+    class Config:
+        from_attributes = True
 

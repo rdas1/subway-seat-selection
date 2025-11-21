@@ -39,6 +39,7 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
   const [showTagLibrary, setShowTagLibrary] = useState<boolean>(false);
   const [tagLibrary, setTagLibrary] = useState<TagLibraryResponse | null>(null);
   const [isInStudy, setIsInStudy] = useState<boolean>(false);
+  const hasAutoCreatedQuestion = useRef<boolean>(false);
 
   // Initialize grid with sample pattern if dimensions match, otherwise empty
   const initializeGrid = useCallback((height: number, width: number) => {
@@ -803,6 +804,33 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
     }
   };
 
+  const handleCreateQuestionFromForm = async (updates: Partial<PostResponseQuestionCreate>) => {
+    if (!savedConfig?.id) return;
+    
+    if (!updates.question_text || !updates.question_text.trim()) {
+      setError('Question text is required');
+      return;
+    }
+    
+    const newQuestion: PostResponseQuestionCreate = {
+      question_text: updates.question_text,
+      is_required: updates.is_required ?? false,
+      free_text_required: updates.free_text_required ?? false,
+      allows_free_text: updates.allows_free_text ?? true,
+      allows_tags: updates.allows_tags ?? true,
+      order: questions.length,
+      tag_ids: updates.tag_ids ?? []
+    };
+    
+    try {
+      const created = await trainConfigApi.createQuestion(savedConfig.id, newQuestion);
+      setQuestions([...questions, created]);
+      setEditingQuestion(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create question');
+    }
+  };
+
   const handleUpdateQuestion = async (questionId: number, updates: Partial<PostResponseQuestionCreate>) => {
     if (!savedConfig?.id) return;
     
@@ -906,6 +934,51 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
         try {
           const questionsData = await trainConfigApi.getQuestions(savedConfig.id);
           setQuestions(questionsData);
+          
+          // Check if we should open the question creation form
+          const addQuestion = searchParams.get('addQuestion') === 'true'
+          if (addQuestion && !hasAutoCreatedQuestion.current) {
+            hasAutoCreatedQuestion.current = true;
+            
+            // Remove the query parameter from URL first to prevent re-triggering
+            const newSearchParams = new URLSearchParams(searchParams)
+            newSearchParams.delete('addQuestion')
+            navigate(`/scenario-editor/${savedConfig.id}${newSearchParams.toString() ? `?${newSearchParams.toString()}` : ''}`, { replace: true })
+            
+            // Scroll to questions section
+            setTimeout(() => {
+              const questionsSection = document.getElementById('questions-section')
+              if (questionsSection) {
+                questionsSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              }
+            }, 100)
+            
+            // Open question creation form
+            setTimeout(() => {
+              // Create a temporary question object for the form
+              const tempQuestion: PostResponseQuestionResponse = {
+                id: -1, // Temporary ID
+                question_id: -1,
+                train_configuration_id: savedConfig.id,
+                is_required: false,
+                free_text_required: false,
+                order: questionsData.length,
+                is_default: false,
+                created_at: new Date().toISOString(),
+                updated_at: undefined,
+                question: {
+                  id: -1,
+                  question_text: '',
+                  allows_free_text: true,
+                  allows_tags: true,
+                  created_at: new Date().toISOString(),
+                  updated_at: undefined
+                },
+                tags: []
+              };
+              setEditingQuestion(tempQuestion);
+            }, 300)
+          }
         } catch (err) {
           console.error('Failed to load questions:', err);
         } finally {
@@ -915,7 +988,9 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
       loadQuestions();
     } else {
       setQuestions([]);
+      hasAutoCreatedQuestion.current = false; // Reset when config changes
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedConfig?.id]);
 
   // Check if scenario is in a study
@@ -1216,7 +1291,7 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
 
       {/* Questions Management Section */}
       {savedConfig?.id && (
-        <div className="questions-section">
+        <div id="questions-section" className="questions-section">
           <h2 className="questions-section-title">Post-Response Questions</h2>
           {loadingQuestions ? (
             <p>Loading questions...</p>
@@ -1353,13 +1428,21 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
         <div className="question-editor-overlay" onClick={() => setEditingQuestion(null)}>
           <div className="question-editor-modal" onClick={(e) => e.stopPropagation()}>
             <div className="question-editor-header">
-              <h3>Edit Question</h3>
+              <h3>{editingQuestion.id === -1 ? 'Create Question' : 'Edit Question'}</h3>
               <button onClick={() => setEditingQuestion(null)} className="close-modal">×</button>
             </div>
             <QuestionEditor
               question={editingQuestion}
               isInStudy={isInStudy}
-              onSave={(updates) => handleUpdateQuestion(editingQuestion.id, updates)}
+              onSave={(updates) => {
+                if (editingQuestion.id === -1) {
+                  // Creating new question
+                  handleCreateQuestionFromForm(updates);
+                } else {
+                  // Updating existing question
+                  handleUpdateQuestion(editingQuestion.id, updates);
+                }
+              }}
               onCancel={() => setEditingQuestion(null)}
             />
           </div>
@@ -1504,6 +1587,11 @@ function QuestionEditor({
   const [allowsTags, setAllowsTags] = useState(question.question.allows_tags);
 
   const handleSave = () => {
+    // Validate question text for new questions
+    if (question.id === -1 && (!questionText || !questionText.trim())) {
+      return; // Don't save if question text is empty for new questions
+    }
+    
     onSave({
       question_text: question.is_default ? undefined : questionText,
       is_required: isRequired,
@@ -1574,7 +1662,13 @@ function QuestionEditor({
       )}
       <div className="question-editor-actions">
         <button onClick={onCancel} className="cancel-button">Cancel</button>
-        <button onClick={handleSave} className="save-button">Save</button>
+        <button 
+          onClick={handleSave} 
+          className="save-button"
+          disabled={question.id === -1 && (!questionText || !questionText.trim())}
+        >
+          {question.id === -1 ? 'Create' : 'Save'}
+        </button>
       </div>
     </div>
   );

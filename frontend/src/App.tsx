@@ -67,7 +67,7 @@ function Navigation() {
               onClick={toggleCreateDropdown}
               onBlur={() => setTimeout(() => setCreateDropdownOpen(false), 200)}
             >
-              Create
+              Create{user ? '/Manage' : ''}
               <span className="nav-dropdown-icon">{createDropdownOpen ? '▲' : '▼'}</span>
             </button>
             {createDropdownOpen && (

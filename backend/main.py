@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text, select, func, and_
 from sqlalchemy.orm import selectinload
 from contextlib import asynccontextmanager
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime, timedelta
 import os
 import random
@@ -13,7 +13,7 @@ from database import init_db, close_db, get_db
 from models import (
     Base, TrainConfiguration, UserResponse, ScenarioGroup, ScenarioGroupItem, User, 
     EmailVerification, ScenarioGroupEditor, Study, Question, PostResponseQuestion, 
-    QuestionTag, QuestionTagAssignment, QuestionResponse, QuestionResponseTag
+    PreStudyQuestion, QuestionTag, QuestionTagAssignment, QuestionResponse, QuestionResponseTag
 )
 
 # Default tags that should be available for the default question
@@ -55,7 +55,9 @@ from schemas import (
     QuestionResponseCreate,
     QuestionResponseResponse,
     TagStatisticsResponse,
-    TagLibraryResponse
+    TagLibraryResponse,
+    PreStudyQuestionCreate,
+    PreStudyQuestionResponse
 )
 from services.email import send_verification_email
 from utils.auth import create_access_token, generate_verification_token, generate_verification_code, ACCESS_TOKEN_EXPIRE_MINUTES
@@ -187,7 +189,8 @@ async def create_train_configuration(
     default_question = Question(
         question_text="Why did you choose this spot?",
         allows_free_text=True,
-        allows_tags=True
+        allows_tags=True,
+        allows_multiple_tags=True
     )
     db.add(default_question)
     await db.flush()  # Flush to get the question ID
@@ -1609,6 +1612,410 @@ async def delete_study(
     return None
 
 
+# PreStudyQuestion Endpoints
+
+@app.post("/studies/{study_id}/pre-study-questions", response_model=PreStudyQuestionResponse, status_code=status.HTTP_201_CREATED)
+async def create_pre_study_question(
+    study_id: int,
+    question_data: PreStudyQuestionCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Create a pre-study question for a study.
+    Requires authentication and user must be the study creator.
+    """
+    # Verify study exists and user is creator
+    study_result = await db.execute(
+        select(Study).where(Study.id == study_id)
+    )
+    study = study_result.scalar_one_or_none()
+    
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    if study.created_by_user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to modify this study"
+        )
+    
+    # Create or link question
+    if question_data.question_id:
+        # Link to existing question
+        question_result = await db.execute(
+            select(Question).where(Question.id == question_data.question_id)
+        )
+        question = question_result.scalar_one_or_none()
+        if question is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Question with id {question_data.question_id} not found"
+            )
+    else:
+        # Create new question
+        if not question_data.question_text or not question_data.question_text.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="question_text is required when question_id is not provided"
+            )
+        
+        question = Question(
+            question_text=question_data.question_text,
+            allows_free_text=question_data.allows_free_text,
+            allows_tags=question_data.allows_tags,
+            allows_multiple_tags=question_data.allows_multiple_tags if hasattr(question_data, 'allows_multiple_tags') else True
+        )
+        db.add(question)
+        await db.flush()  # Get the question ID
+    
+    # Check if question is already assigned to this study
+    existing_result = await db.execute(
+        select(PreStudyQuestion).where(
+            PreStudyQuestion.question_id == question.id,
+            PreStudyQuestion.study_id == study_id
+        )
+    )
+    if existing_result.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This question is already assigned to this study"
+        )
+    
+    # Determine order
+    order_result = await db.execute(
+        select(PreStudyQuestion).where(PreStudyQuestion.study_id == study_id)
+    )
+    existing_questions = order_result.scalars().all()
+    order = question_data.order if question_data.order is not None else len(existing_questions)
+    
+    # Create PreStudyQuestion
+    pre_study_question = PreStudyQuestion(
+        question_id=question.id,
+        study_id=study_id,
+        order=order
+    )
+    db.add(pre_study_question)
+    await db.flush()
+    
+    # Assign tags if provided
+    if question_data.tag_ids:
+        for tag_id in question_data.tag_ids:
+            tag_result = await db.execute(
+                select(QuestionTag).where(QuestionTag.id == tag_id)
+            )
+            tag = tag_result.scalar_one_or_none()
+            if tag is None:
+                continue
+            
+            assignment = QuestionTagAssignment(
+                question_id=question.id,
+                tag_id=tag_id,
+                order=len(question_data.tag_ids)  # Simple order
+            )
+            db.add(assignment)
+    
+    await db.commit()
+    await db.refresh(pre_study_question)
+    
+    # Load question and tags
+    await db.refresh(question)
+    await db.refresh(pre_study_question)
+    
+    # Get tags
+    tag_assignments_result = await db.execute(
+        select(QuestionTagAssignment).where(QuestionTagAssignment.question_id == question.id)
+        .options(selectinload(QuestionTagAssignment.tag))
+    )
+    tag_assignments = tag_assignments_result.scalars().all()
+    tags = [assignment.tag for assignment in tag_assignments]
+    
+    return PreStudyQuestionResponse(
+        id=pre_study_question.id,
+        question_id=pre_study_question.question_id,
+        study_id=pre_study_question.study_id,
+        order=pre_study_question.order,
+        created_at=pre_study_question.created_at,
+        updated_at=pre_study_question.updated_at,
+        question=QuestionResponseSchema(
+            id=question.id,
+            question_text=question.question_text,
+            allows_free_text=question.allows_free_text,
+            allows_tags=question.allows_tags,
+            allows_multiple_tags=question.allows_multiple_tags,
+            created_at=question.created_at,
+            updated_at=question.updated_at
+        ),
+        tags=[QuestionTagResponse(
+            id=tag.id,
+            tag_text=tag.tag_text,
+            is_default=tag.is_default,
+            created_by_user_id=tag.created_by_user_id,
+            created_at=tag.created_at
+        ) for tag in tags]
+    )
+
+
+@app.get("/studies/{study_id}/pre-study-questions", response_model=List[PreStudyQuestionResponse])
+async def get_pre_study_questions(
+    study_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all pre-study questions for a study.
+    """
+    # Verify study exists
+    study_result = await db.execute(
+        select(Study).where(Study.id == study_id)
+    )
+    if study_result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    result = await db.execute(
+        select(PreStudyQuestion)
+        .where(PreStudyQuestion.study_id == study_id)
+        .options(
+            selectinload(PreStudyQuestion.question),
+            selectinload(PreStudyQuestion.question).selectinload(Question.tag_assignments).selectinload(QuestionTagAssignment.tag)
+        )
+        .order_by(PreStudyQuestion.order)
+    )
+    pre_questions = result.scalars().all()
+    
+    # Build responses
+    responses = []
+    for pre_q in pre_questions:
+        tags = [assignment.tag for assignment in pre_q.question.tag_assignments]
+        responses.append(PreStudyQuestionResponse(
+            id=pre_q.id,
+            question_id=pre_q.question_id,
+            study_id=pre_q.study_id,
+            order=pre_q.order,
+            created_at=pre_q.created_at,
+            updated_at=pre_q.updated_at,
+            question=QuestionResponseSchema(
+                id=pre_q.question.id,
+                question_text=pre_q.question.question_text,
+                allows_free_text=pre_q.question.allows_free_text,
+                allows_tags=pre_q.question.allows_tags,
+                allows_multiple_tags=pre_q.question.allows_multiple_tags,
+                created_at=pre_q.question.created_at,
+                updated_at=pre_q.question.updated_at
+            ),
+            tags=[QuestionTagResponse(
+                id=tag.id,
+                tag_text=tag.tag_text,
+                is_default=tag.is_default,
+                created_by_user_id=tag.created_by_user_id,
+                created_at=tag.created_at
+            ) for tag in tags]
+        ))
+    
+    return responses
+
+
+@app.put("/studies/{study_id}/pre-study-questions/{pre_study_question_id}", response_model=PreStudyQuestionResponse)
+async def update_pre_study_question(
+    study_id: int,
+    pre_study_question_id: int,
+    question_data: PreStudyQuestionCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update a pre-study question.
+    Requires authentication and user must be the study creator.
+    """
+    # Verify study exists and user is creator
+    study_result = await db.execute(
+        select(Study).where(Study.id == study_id)
+    )
+    study = study_result.scalar_one_or_none()
+    
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    if study.created_by_user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to modify this study"
+        )
+    
+    # Get pre-study question
+    pre_q_result = await db.execute(
+        select(PreStudyQuestion).where(
+            PreStudyQuestion.id == pre_study_question_id,
+            PreStudyQuestion.study_id == study_id
+        )
+    )
+    pre_study_question = pre_q_result.scalar_one_or_none()
+    
+    if pre_study_question is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pre-study question with id {pre_study_question_id} not found"
+        )
+    
+    # Update order if provided
+    if question_data.order is not None:
+        pre_study_question.order = question_data.order
+    
+    # Update question text if provided (for new questions only, not linked ones)
+    if question_data.question_text and not question_data.question_id:
+        question_result = await db.execute(
+            select(Question).where(Question.id == pre_study_question.question_id)
+        )
+        question = question_result.scalar_one()
+        question.question_text = question_data.question_text
+        question.allows_free_text = question_data.allows_free_text
+        question.allows_tags = question_data.allows_tags
+        if hasattr(question_data, 'allows_multiple_tags'):
+            question.allows_multiple_tags = question_data.allows_multiple_tags
+        if hasattr(question_data, 'allows_multiple_tags'):
+            question.allows_multiple_tags = question_data.allows_multiple_tags
+    
+    # Update tag assignments
+    if question_data.tag_ids is not None:
+        current_tag_assignments_result = await db.execute(
+            select(QuestionTagAssignment).where(
+                QuestionTagAssignment.question_id == pre_study_question.question_id
+            )
+        )
+        current_tag_assignments = current_tag_assignments_result.scalars().all()
+        current_tag_ids = {assignment.tag_id for assignment in current_tag_assignments}
+        
+        tags_to_add = set(question_data.tag_ids) - current_tag_ids
+        tags_to_remove = current_tag_ids - set(question_data.tag_ids)
+        
+        # Remove tags no longer in the list
+        for assignment in current_tag_assignments:
+            if assignment.tag_id in tags_to_remove:
+                await db.delete(assignment)
+        
+        # Add new tags
+        for order, tag_id in enumerate(question_data.tag_ids):
+            if tag_id in tags_to_add:
+                tag_result = await db.execute(
+                    select(QuestionTag).where(QuestionTag.id == tag_id)
+                )
+                tag = tag_result.scalar_one_or_none()
+                if tag is None:
+                    continue
+                
+                assignment = QuestionTagAssignment(
+                    question_id=pre_study_question.question_id,
+                    tag_id=tag_id,
+                    order=order
+                )
+                db.add(assignment)
+            else:
+                # Update order for existing tags
+                for existing_assignment in current_tag_assignments:
+                    if existing_assignment.tag_id == tag_id:
+                        existing_assignment.order = order
+                        break
+    
+    await db.commit()
+    await db.refresh(pre_study_question)
+    
+    # Get updated question and tags
+    question_result = await db.execute(
+        select(Question).where(Question.id == pre_study_question.question_id)
+    )
+    question = question_result.scalar_one()
+    
+    tag_assignments_result = await db.execute(
+        select(QuestionTagAssignment).where(QuestionTagAssignment.question_id == question.id)
+        .options(selectinload(QuestionTagAssignment.tag))
+    )
+    tag_assignments = tag_assignments_result.scalars().all()
+    tags = [assignment.tag for assignment in tag_assignments]
+    
+    return PreStudyQuestionResponse(
+        id=pre_study_question.id,
+        question_id=pre_study_question.question_id,
+        study_id=pre_study_question.study_id,
+        order=pre_study_question.order,
+        created_at=pre_study_question.created_at,
+        updated_at=pre_study_question.updated_at,
+        question=QuestionResponseSchema(
+            id=question.id,
+            question_text=question.question_text,
+            allows_free_text=question.allows_free_text,
+            allows_tags=question.allows_tags,
+            allows_multiple_tags=question.allows_multiple_tags,
+            created_at=question.created_at,
+            updated_at=question.updated_at
+        ),
+        tags=[QuestionTagResponse(
+            id=tag.id,
+            tag_text=tag.tag_text,
+            is_default=tag.is_default,
+            created_by_user_id=tag.created_by_user_id,
+            created_at=tag.created_at
+        ) for tag in tags]
+    )
+
+
+@app.delete("/studies/{study_id}/pre-study-questions/{pre_study_question_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_pre_study_question(
+    study_id: int,
+    pre_study_question_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Delete a pre-study question.
+    Requires authentication and user must be the study creator.
+    """
+    # Verify study exists and user is creator
+    study_result = await db.execute(
+        select(Study).where(Study.id == study_id)
+    )
+    study = study_result.scalar_one_or_none()
+    
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    if study.created_by_user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to modify this study"
+        )
+    
+    # Get pre-study question
+    pre_q_result = await db.execute(
+        select(PreStudyQuestion).where(
+            PreStudyQuestion.id == pre_study_question_id,
+            PreStudyQuestion.study_id == study_id
+        )
+    )
+    pre_study_question = pre_q_result.scalar_one_or_none()
+    
+    if pre_study_question is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Pre-study question with id {pre_study_question_id} not found"
+        )
+    
+    await db.delete(pre_study_question)
+    await db.commit()
+    
+    return None
+
+
 # Question Endpoints
 
 @app.post("/train-configurations/{config_id}/questions", response_model=PostResponseQuestionResponse, status_code=status.HTTP_201_CREATED)
@@ -1677,7 +2084,8 @@ async def create_post_response_question(
         question = Question(
             question_text=question_data.question_text,
             allows_free_text=question_data.allows_free_text,
-            allows_tags=question_data.allows_tags
+            allows_tags=question_data.allows_tags,
+            allows_multiple_tags=question_data.allows_multiple_tags if hasattr(question_data, 'allows_multiple_tags') else True
         )
         db.add(question)
         await db.flush()
@@ -1751,6 +2159,7 @@ async def create_post_response_question(
             question_text=post_response_question.question.question_text,
             allows_free_text=post_response_question.question.allows_free_text,
             allows_tags=post_response_question.question.allows_tags,
+            allows_multiple_tags=post_response_question.question.allows_multiple_tags,
             created_at=post_response_question.question.created_at,
             updated_at=post_response_question.question.updated_at
         ),
@@ -1802,6 +2211,7 @@ async def get_post_response_questions(
                 question_text=post_q.question.question_text,
                 allows_free_text=post_q.question.allows_free_text,
                 allows_tags=post_q.question.allows_tags,
+                allows_multiple_tags=post_q.question.allows_multiple_tags,
                 created_at=post_q.question.created_at,
                 updated_at=post_q.question.updated_at
             ),
@@ -1894,35 +2304,43 @@ async def update_post_response_question(
     
     # Update tag assignments
     if question_data.tag_ids is not None:
-        # Remove existing assignments
-        await db.execute(
+        # Get existing assignments
+        existing_assignments_result = await db.execute(
             select(QuestionTagAssignment).where(
                 QuestionTagAssignment.question_id == post_response_question.question_id
             )
         )
-        existing_assignments = await db.execute(
-            select(QuestionTagAssignment).where(
-                QuestionTagAssignment.question_id == post_response_question.question_id
-            )
-        )
-        for assignment in existing_assignments.scalars().all():
-            await db.delete(assignment)
+        existing_assignments = existing_assignments_result.scalars().all()
+        existing_tag_ids = {assignment.tag_id for assignment in existing_assignments}
+        new_tag_ids = set(question_data.tag_ids)
         
-        # Add new assignments
-        for tag_id in question_data.tag_ids:
-            tag_result = await db.execute(
-                select(QuestionTag).where(QuestionTag.id == tag_id)
-            )
-            tag = tag_result.scalar_one_or_none()
-            if tag is None:
-                continue
-            
-            assignment = QuestionTagAssignment(
-                question_id=post_response_question.question_id,
-                tag_id=tag_id,
-                order=len(question_data.tag_ids) - question_data.tag_ids.index(tag_id)
-            )
-            db.add(assignment)
+        # Remove assignments that are no longer in the new list
+        for assignment in existing_assignments:
+            if assignment.tag_id not in new_tag_ids:
+                await db.delete(assignment)
+        
+        # Add new assignments (only for tags that don't already exist)
+        for order, tag_id in enumerate(question_data.tag_ids):
+            if tag_id not in existing_tag_ids:
+                tag_result = await db.execute(
+                    select(QuestionTag).where(QuestionTag.id == tag_id)
+                )
+                tag = tag_result.scalar_one_or_none()
+                if tag is None:
+                    continue
+                
+                assignment = QuestionTagAssignment(
+                    question_id=post_response_question.question_id,
+                    tag_id=tag_id,
+                    order=order
+                )
+                db.add(assignment)
+        
+        # Update order for existing assignments
+        for assignment in existing_assignments:
+            if assignment.tag_id in new_tag_ids:
+                new_order = question_data.tag_ids.index(assignment.tag_id)
+                assignment.order = new_order
     
     await db.commit()
     
@@ -1954,6 +2372,7 @@ async def update_post_response_question(
             question_text=post_response_question.question.question_text,
             allows_free_text=post_response_question.question.allows_free_text,
             allows_tags=post_response_question.question.allows_tags,
+            allows_multiple_tags=post_response_question.question.allows_multiple_tags,
             created_at=post_response_question.question.created_at,
             updated_at=post_response_question.question.updated_at
         ),
@@ -2325,4 +2744,61 @@ async def get_tag_statistics(
     statistics.sort(key=lambda x: x.selection_count, reverse=True)
     
     return statistics
+
+
+@app.get("/train-configurations/{config_id}/question-responses", response_model=Dict[int, List[QuestionResponseResponse]])
+async def get_question_responses_for_scenario(
+    config_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all question responses for a scenario, grouped by post_response_question_id.
+    Returns a dictionary mapping question_id -> list of responses.
+    """
+    # Get all post-response questions for this scenario
+    post_q_result = await db.execute(
+        select(PostResponseQuestion).where(
+            PostResponseQuestion.train_configuration_id == config_id
+        )
+    )
+    post_questions = post_q_result.scalars().all()
+    post_question_ids = [pq.id for pq in post_questions]
+    
+    if not post_question_ids:
+        return {}
+    
+    # Get all question responses for these questions
+    qr_result = await db.execute(
+        select(QuestionResponse)
+        .where(QuestionResponse.post_response_question_id.in_(post_question_ids))
+        .options(
+            selectinload(QuestionResponse.selected_tags).selectinload(QuestionResponseTag.tag)
+        )
+        .order_by(QuestionResponse.created_at.desc())
+    )
+    question_responses = qr_result.scalars().all()
+    
+    # Group by post_response_question_id
+    grouped = {}
+    for qr in question_responses:
+        question_id = qr.post_response_question_id
+        if question_id not in grouped:
+            grouped[question_id] = []
+        
+        grouped[question_id].append(QuestionResponseResponse(
+            id=qr.id,
+            user_response_id=qr.user_response_id,
+            post_response_question_id=qr.post_response_question_id,
+            free_text_response=qr.free_text_response,
+            created_at=qr.created_at,
+            selected_tags=[QuestionTagResponse(
+                id=tag.tag.id,
+                tag_text=tag.tag.tag_text,
+                is_default=tag.tag.is_default,
+                created_by_user_id=tag.tag.created_by_user_id,
+                created_at=tag.tag.created_at
+            ) for tag in qr.selected_tags]
+        ))
+    
+    return grouped
 
