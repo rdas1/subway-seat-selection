@@ -71,6 +71,8 @@ export default function StudyDetail() {
     selection_heatmap: Record<string, number>
   } | null>(null)
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set())
+  const [showShareBanner, setShowShareBanner] = useState<boolean>(false)
+  const [linkCopied, setLinkCopied] = useState<boolean>(false)
   const [preStudyQuestions, setPreStudyQuestions] = useState<PreStudyQuestionResponse[]>([])
   const [loadingPreStudyQuestions, setLoadingPreStudyQuestions] = useState<boolean>(false)
   const [editingPreStudyQuestion, setEditingPreStudyQuestion] = useState<PreStudyQuestionResponse | null>(null)
@@ -733,14 +735,70 @@ export default function StudyDetail() {
             ← Back
           </button>
           <div className="study-detail-header-actions">
-            <button className="preview-button">
+            <button 
+              className="preview-button"
+              onClick={() => window.open(`/study/${study.id}`, '_blank')}
+            >
               Preview
             </button>
-            <button className="share-button">
+            <button 
+              className="share-button"
+              onClick={() => setShowShareBanner(true)}
+            >
               Share
             </button>
           </div>
         </div>
+        {showShareBanner && (
+          <div className="share-banner">
+            <div className="share-banner-content">
+              <div className="share-banner-header">
+                <h3>Share Study Link</h3>
+                <button 
+                  className="share-banner-close"
+                  onClick={() => {
+                    setShowShareBanner(false)
+                    setLinkCopied(false)
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+              <div className="share-banner-link-container">
+                <input
+                  type="text"
+                  readOnly
+                  value={`${window.location.origin}/study/${study.id}`}
+                  className="share-banner-link-input"
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                />
+                <button
+                  className="share-banner-copy-button"
+                  onClick={async () => {
+                    const link = `${window.location.origin}/study/${study.id}`
+                    try {
+                      await navigator.clipboard.writeText(link)
+                      setLinkCopied(true)
+                      setTimeout(() => setLinkCopied(false), 2000)
+                    } catch (err) {
+                      console.error('Failed to copy link:', err)
+                      // Fallback: select the text
+                      const input = document.querySelector('.share-banner-link-input') as HTMLInputElement
+                      if (input) {
+                        input.select()
+                        document.execCommand('copy')
+                        setLinkCopied(true)
+                        setTimeout(() => setLinkCopied(false), 2000)
+                      }
+                    }
+                  }}
+                >
+                  {linkCopied ? '✓ Copied!' : 'Copy Link'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {(saving || study.updated_at) && (
           <div className="last-saved-indicator">
             {saving ? (

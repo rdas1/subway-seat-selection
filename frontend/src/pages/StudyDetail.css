@@ -1518,6 +1518,97 @@
   color: white;
 }
 
+.share-banner {
+  background-color: #1a1a1a;
+  border: 1px solid #3a3a3c;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.share-banner-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.share-banner-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.share-banner-header h3 {
+  margin: 0;
+  color: white;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.share-banner-close {
+  background: none;
+  border: none;
+  color: #a0a0a0;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.share-banner-close:hover {
+  color: white;
+}
+
+.share-banner-link-container {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.share-banner-link-input {
+  flex: 1;
+  padding: 0.75rem;
+  background-color: #3a3a3c;
+  border: 1px solid #565658;
+  border-radius: 4px;
+  color: white;
+  font-size: 0.9rem;
+  font-family: monospace;
+  cursor: text;
+}
+
+.share-banner-link-input:focus {
+  outline: none;
+  border-color: #4a90e2;
+}
+
+.share-banner-copy-button {
+  background-color: #4a90e2;
+  border: none;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.share-banner-copy-button:hover {
+  background-color: #357abd;
+}
+
+.share-banner-copy-button:active {
+  background-color: #2a5f8f;
+}
+
 .error-message {
   padding: 1rem;
   background-color: rgba(220, 53, 69, 0.2);
