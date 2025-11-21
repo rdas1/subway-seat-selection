@@ -751,6 +751,16 @@ export const postStudyQuestionApi = {
 };
 
 // Question API
+export interface QuestionResponse {
+  id: number;
+  question_text: string;
+  allows_free_text: boolean;
+  allows_tags: boolean;
+  allows_multiple_tags: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
 export interface QuestionTagResponse {
   id: number;
   tag_text: string;
@@ -769,15 +779,7 @@ export interface PostResponseQuestionResponse {
   is_default: boolean;
   created_at: string;
   updated_at?: string;
-  question: {
-    id: number;
-    question_text: string;
-    allows_free_text: boolean;
-    allows_tags: boolean;
-    allows_multiple_tags: boolean;
-    created_at: string;
-    updated_at?: string;
-  };
+  question: QuestionResponse;
   tags: QuestionTagResponse[];
 }
 
