@@ -17,7 +17,7 @@ interface SeatSelectionAppProps {
   hasPreviousResponse?: boolean;
 }
 
-export default function SeatSelectionApp({ initialGrid, playerGender, onSelectionChange, onSelectionTypeChange, clearSelectionTrigger, platformRecreateTrigger, animationState = 'idle', showTrain = true, hasPreviousResponse = false }: SeatSelectionAppProps) {
+export default function SeatSelectionApp({ initialGrid, playerGender, onSelectionChange, onSelectionTypeChange, clearSelectionTrigger, platformRecreateTrigger, animationState = 'idle', showTrain = true, hasPreviousResponse: _hasPreviousResponse = false }: SeatSelectionAppProps) {
   const [grid, setGrid] = useState<SubwayGrid | null>(initialGrid);
   const [platformGrid, setPlatformGrid] = useState<SubwayGrid>(() => {
     const height = initialGrid?.height ?? 20; // Default height if no grid

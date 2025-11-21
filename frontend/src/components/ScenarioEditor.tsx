@@ -27,11 +27,11 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
   const [saving, setSaving] = useState(false);
   const [savingTitle, setSavingTitle] = useState(false);
   const [savedConfig, setSavedConfig] = useState<TrainConfigurationResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [_error, setError] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [showSaveBanner, setShowSaveBanner] = useState(false);
-  const [gridHeight, setGridHeight] = useState<number>(20);
-  const [gridWidth, setGridWidth] = useState<number>(5);
+  const [gridHeight, _setGridHeight] = useState<number>(20);
+  const [gridWidth, _setGridWidth] = useState<number>(5);
   const titleDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [questions, setQuestions] = useState<PostResponseQuestionResponse[]>([]);
   const [loadingQuestions, setLoadingQuestions] = useState<boolean>(false);

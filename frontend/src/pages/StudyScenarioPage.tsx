@@ -6,7 +6,7 @@ import Legend from '../components/Legend'
 import StudyProgressBar from '../components/StudyProgressBar'
 import { SubwayGrid } from '../classes/SubwayGrid'
 import { PlayerGender } from '../App'
-import { studyApi, trainConfigApi, userResponseApi, QuestionResponseCreate, studyProgressApi, StudyProgressResponse } from '../services/api'
+import { studyApi, trainConfigApi, userResponseApi, QuestionResponseCreate, studyProgressApi } from '../services/api'
 import { getSessionId } from '../utils/session'
 
 export default function StudyScenarioPage() {
@@ -20,11 +20,11 @@ export default function StudyScenarioPage() {
   const [selectionType, setSelectionType] = useState<'train' | 'platform' | null>(null)
   const [grid, setGrid] = useState<SubwayGrid | null>(null)
   const [clearSelectionTrigger, setClearSelectionTrigger] = useState<number>(0)
-  const [platformRecreateTrigger, setPlatformRecreateTrigger] = useState<number>(0)
+  const [platformRecreateTrigger, _setPlatformRecreateTrigger] = useState<number>(0)
   const [gridAnimation, setGridAnimation] = useState<'idle' | 'slidingIn' | 'slidingOut'>('idle')
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
-  const [scenarioName, setScenarioName] = useState<string | null>(null)
+  const [_scenarioName, setScenarioName] = useState<string | null>(null)
   const [scenarioTitle, setScenarioTitle] = useState<string | null>(null)
   const [scenarioId, setScenarioId] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState<boolean>(false)

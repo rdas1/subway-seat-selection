@@ -193,29 +193,6 @@ export default function StudyDetail() {
   }
 
   // Question management handlers
-  const handleCreateQuestion = async (scenarioId: number) => {
-    const newQuestion: PostResponseQuestionCreate = {
-      question_text: '',
-      is_required: false,
-      free_text_required: false,
-      allows_free_text: true,
-      allows_tags: true,
-      order: (questions.get(scenarioId)?.length || 0),
-      tag_ids: []
-    }
-    
-    try {
-      const created = await trainConfigApi.createQuestion(scenarioId, newQuestion)
-      const updatedMap = new Map(questions)
-      const scenarioQuestions = updatedMap.get(scenarioId) || []
-      updatedMap.set(scenarioId, [...scenarioQuestions, created])
-      setQuestions(updatedMap)
-      setEditingQuestion({ scenarioId, question: created })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create question')
-    }
-  }
-
   const handleUpdateQuestion = async (scenarioId: number, questionId: number, updates: Partial<PostResponseQuestionCreate>) => {
     const question = questions.get(scenarioId)?.find(q => q.id === questionId)
     if (!question) return

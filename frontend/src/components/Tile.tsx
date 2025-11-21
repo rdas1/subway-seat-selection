@@ -19,7 +19,7 @@ interface TileProps {
   draggable?: boolean;
 }
 
-export default function Tile({ tile, onClick, isEligible, isSelected, playerEmoji, colIndex, gridWidth, doorsOpen, isPlatformCaution = false, editMode = false, onDragStart, onDragOver, onDrop, draggable = false }: TileProps) {
+export default function Tile({ tile, onClick, isEligible, isSelected, playerEmoji, colIndex, gridWidth, doorsOpen, isPlatformCaution = false, editMode: _editMode = false, onDragStart, onDragOver, onDrop, draggable = false }: TileProps) {
   const handleClick = () => {
     if (isEligible) {
       onClick();

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { SubwayGrid } from '../classes/SubwayGrid'
-import { trainConfigApi, PostResponseQuestionResponse, QuestionResponseCreate, QuestionTagResponse, TagStatisticsResponse } from '../services/api'
+import { trainConfigApi, PostResponseQuestionResponse, QuestionResponseCreate } from '../services/api'
 import { EMOJI_MAN, EMOJI_WOMAN, EMOJI_NEUTRAL } from '../constants/emojis'
 import Grid from './Grid'
 import './StatisticsView.css'
@@ -23,11 +23,11 @@ interface StatisticsViewProps {
   onValidationChange?: (isValid: boolean) => void
 }
 
-export default function StatisticsView({ grid, scenarioId, statistics, onStatisticsUpdate, userSelection, userResponseId, onQuestionResponsesChange, onValidationChange }: StatisticsViewProps) {
+export default function StatisticsView({ grid, scenarioId, statistics, onStatisticsUpdate, userSelection, userResponseId: _userResponseId, onQuestionResponsesChange, onValidationChange }: StatisticsViewProps) {
   const [selectedGender, setSelectedGender] = useState<'man' | 'woman' | 'neutral' | 'all'>('all')
   const [loading, setLoading] = useState(false)
   const [questions, setQuestions] = useState<PostResponseQuestionResponse[]>([])
-  const [loadingQuestions, setLoadingQuestions] = useState(false)
+  const [_loadingQuestions, setLoadingQuestions] = useState(false)
   const [questionResponses, setQuestionResponses] = useState<Map<number, { freeText: string; selectedTagIds: number[] }>>(new Map())
   const [tagStatistics, setTagStatistics] = useState<Map<number, Map<number, number>>>(new Map()) // questionId -> tagId -> count
   const [tooltip, setTooltip] = useState<{

@@ -20,7 +20,7 @@ export default function ScenarioPage() {
   const [gridAnimation, setGridAnimation] = useState<'idle' | 'slidingIn' | 'slidingOut'>('idle')
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
-  const [scenarioName, setScenarioName] = useState<string | null>(null)
+  const [_scenarioName, setScenarioName] = useState<string | null>(null)
   const [scenarioTitle, setScenarioTitle] = useState<string | null>(null)
   const [scenarioId, setScenarioId] = useState<number | null>(null)
   const [submitting, setSubmitting] = useState<boolean>(false)
