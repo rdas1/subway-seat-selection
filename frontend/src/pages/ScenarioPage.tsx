@@ -6,7 +6,6 @@ import Legend from '../components/Legend'
 import { SubwayGrid } from '../classes/SubwayGrid'
 import { PlayerGender } from '../App'
 import { trainConfigApi, userResponseApi, QuestionResponseCreate } from '../services/api'
-import { getSessionId } from '../utils/session'
 
 export default function ScenarioPage() {
   const { id } = useParams<{ id: string }>()
@@ -88,16 +87,8 @@ export default function ScenarioPage() {
           setScenarioTitle(config.title || null)
           console.log('Random scenario loaded with ID:', config.id, 'Name:', config.name, 'Title:', config.title)
           
-          // Check if user has already responded to this scenario (for hiding platform user indicator)
-          try {
-            const sessionId = getSessionId()
-            const previousResponse = await userResponseApi.getPreviousResponse(config.id, sessionId)
-            setHasPreviousResponse(!!previousResponse && previousResponse.train_configuration_id === config.id)
-          } catch (err) {
-            console.error('Failed to check previous response:', err)
-            setHasPreviousResponse(false)
-            // Don't block scenario loading if this fails
-          }
+          // No need to check for previous responses in regular scenarios
+          setHasPreviousResponse(false)
             
             // Update URL to include scenario ID
             navigate(`/scenario/${config.id}`, { replace: true })
@@ -153,16 +144,8 @@ export default function ScenarioPage() {
         setScenarioId(scenarioId)
         console.log('Scenario ID set for responses:', scenarioId)
         
-        // Check if user has already responded to this scenario (for hiding platform user indicator)
-        try {
-          const sessionId = getSessionId()
-          const previousResponse = await userResponseApi.getPreviousResponse(scenarioId, sessionId)
-          setHasPreviousResponse(!!previousResponse && previousResponse.train_configuration_id === scenarioId)
-        } catch (err) {
-          console.error('Failed to check previous response:', err)
-          setHasPreviousResponse(false)
-          // Don't block scenario loading if this fails
-        }
+        // No need to check for previous responses in regular scenarios
+        setHasPreviousResponse(false)
         
         // Trigger slide-in animation
         setGridAnimation('slidingIn')
@@ -219,15 +202,14 @@ export default function ScenarioPage() {
             selection_type: responseSelectionType,
           })
           
-          // Submit the user response with session ID
-          const sessionId = getSessionId()
+          // Submit the user response (no session ID for regular scenarios)
           const response = await userResponseApi.create({
             train_configuration_id: scenarioId,
             row: selectedTile.row,
             col: selectedTile.col,
             selection_type: responseSelectionType,
             gender: playerGender,
-            user_session_id: sessionId,
+            user_session_id: undefined, // No session tracking for regular scenarios
           })
           
           console.log('POST request successful:', response)

@@ -370,7 +370,8 @@ async def create_user_response(
 ):
     """
     Submit a user response (where they chose to sit or stand).
-    If a response already exists for this session and scenario, it will be updated instead of creating a new one.
+    If a response already exists for this session and scenario (when user_session_id is provided), it will be updated instead of creating a new one.
+    If no session ID is provided, a new response is always created.
     """
     # Verify that the train configuration exists
     config_result = await db.execute(

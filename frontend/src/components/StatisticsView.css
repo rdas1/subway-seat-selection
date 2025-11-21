@@ -121,7 +121,7 @@
 }
 
 .statistics-view .agreement-message {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
   padding: 12px;
   background-color: rgba(0, 100, 0, 0.2); /* Green to match selection UI */
   border-left: 3px solid #006400; /* Dark green to match selected tile color */
@@ -130,8 +130,27 @@
   font-size: 1em;
 }
 
+.statistics-view .agreement-message:last-child {
+  margin-bottom: 20px;
+}
+
 .statistics-view .agreement-message strong {
   color: white;
+}
+
+.statistics-view .agreement-message-pulse {
+  animation: agreement-pulse 2s ease-in-out infinite;
+}
+
+@keyframes agreement-pulse {
+  0%, 100% {
+    background-color: rgba(0, 100, 0, 0.2);
+    border-left-color: #006400;
+  }
+  50% {
+    background-color: rgba(0, 200, 0, 0.3);
+    border-left-color: #00cc00;
+  }
 }
 
 .statistics-view .statistics-summary h3 {

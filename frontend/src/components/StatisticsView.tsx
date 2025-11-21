@@ -411,22 +411,22 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
               {userSelection && (() => {
                 const key = `${userSelection.row},${userSelection.col}`
                 const totalCount = statistics.selection_heatmap[key] || 0
-                // Subtract 1 to exclude the user's own response
-                const agreementCount = Math.max(0, totalCount - 1)
-                // Calculate percentage of other respondents (excluding user) who made the same choice
-                const otherRespondents = Math.max(0, statistics.total_responses - 1)
-                const percentage = otherRespondents > 0 
-                  ? (agreementCount / otherRespondents) * 100 
+                // Calculate percentage including the user
+                const percentage = statistics.total_responses > 0 
+                  ? (totalCount / statistics.total_responses) * 100 
                   : 0
                 const formattedPercentage = formatPercentage(percentage)
                 return (
-                  <div className="agreement-message">
-                    {agreementCount === 0 ? (
+                  <>
+                    {totalCount === 1 && (
+                      <div className="agreement-message agreement-message-hot-take">
                         <strong>Hot take! You're the first respondent to choose this spot.</strong>
-                    ) : (
-                        <strong>{formattedPercentage}% of respondents chose the same spot as you.</strong>
+                      </div>
                     )}
-                  </div>
+                    <div className="agreement-message agreement-message-percentage agreement-message-pulse">
+                      <strong>{formattedPercentage}% of all respondents chose this spot.</strong>
+                    </div>
+                  </>
                 )
               })()}
 
