@@ -52,21 +52,43 @@ export default function StudyScenarioPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
 
-  // Load total scenarios count
+  // Load total scenarios count and validate progress
   useEffect(() => {
     const loadProgress = async () => {
-      if (studyId) {
+      if (studyId && scenarioNum) {
         try {
           const sessionId = getSessionId()
           const progress = await studyProgressApi.getProgress(studyId, sessionId)
           setTotalScenarios(progress.total_scenarios)
+          
+          // Validate that user has reached this point in the study
+          // Must have completed pre-study questions
+          if (!progress.pre_study_completed) {
+            navigate(`/study/${studyId}/pre-study-questions`, { replace: true })
+            return
+          }
+          
+          // Must have completed previous scenarios (scenarioNum - 1)
+          // Allow access to current scenario even if not fully completed
+          if (scenarioNum > 1 && progress.scenarios_completed < scenarioNum - 1) {
+            // Redirect to the first scenario they haven't completed, or pre-study if none
+            const nextScenario = progress.scenarios_completed + 1
+            if (nextScenario <= progress.total_scenarios) {
+              navigate(`/study/${studyId}/scenario/${nextScenario}`, { replace: true })
+            } else {
+              navigate(`/study/${studyId}/pre-study-questions`, { replace: true })
+            }
+            return
+          }
         } catch (err) {
           console.error('Failed to load progress:', err)
+          // On error, redirect to pre-study questions to be safe
+          navigate(`/study/${studyId}/pre-study-questions`, { replace: true })
         }
       }
     }
     loadProgress()
-  }, [studyId])
+  }, [studyId, scenarioNum, navigate])
 
   // Load statistics when results parameter is present
   useEffect(() => {

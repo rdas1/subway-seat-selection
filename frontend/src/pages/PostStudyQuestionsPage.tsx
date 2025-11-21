@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { postStudyQuestionApi, PostStudyQuestionResponse, postStudyQuestionResponseApi, PostStudyQuestionResponseCreate, studyApi, StudyResponse } from '../services/api'
+import { postStudyQuestionApi, PostStudyQuestionResponse, postStudyQuestionResponseApi, PostStudyQuestionResponseCreate, studyApi, StudyResponse, studyProgressApi } from '../services/api'
 import { getSessionId } from '../utils/session'
 import { useAuth } from '../contexts/AuthContext'
 import StudyProgressBar from '../components/StudyProgressBar'
@@ -19,6 +19,42 @@ export default function PostStudyQuestionsPage() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState<boolean>(false)
   const [questionResponses, setQuestionResponses] = useState<Map<number, { freeText: string; selectedTagIds: number[] }>>(new Map())
+
+  // Validate progress before loading questions
+  useEffect(() => {
+    const validateProgress = async () => {
+      if (!studyId || isNaN(studyId)) {
+        setError('Invalid study ID')
+        setLoading(false)
+        return
+      }
+
+      try {
+        const sessionId = getSessionId()
+        const progress = await studyProgressApi.getProgress(studyId, sessionId)
+        
+        // Must have completed pre-study questions
+        if (!progress.pre_study_completed) {
+          navigate(`/study/${studyId}/pre-study-questions`, { replace: true })
+          return
+        }
+        
+        // Must have completed all scenarios
+        if (progress.scenarios_completed < progress.total_scenarios) {
+          // Redirect to the first scenario they haven't completed
+          const nextScenario = progress.scenarios_completed + 1
+          navigate(`/study/${studyId}/scenario/${nextScenario}`, { replace: true })
+          return
+        }
+      } catch (err) {
+        console.error('Failed to validate progress:', err)
+        // On error, redirect to pre-study questions to be safe
+        navigate(`/study/${studyId}/pre-study-questions`, { replace: true })
+      }
+    }
+
+    validateProgress()
+  }, [studyId, navigate])
 
   // Load questions and existing responses
   useEffect(() => {

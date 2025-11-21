@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom'
 import './App.css'
 import HomePage from './pages/HomePage'
 import ScenarioEditor from './components/ScenarioEditor'
@@ -153,6 +153,7 @@ function App() {
             <Route path="/study-builder/:id" element={<StudyDetail />} />
           <Route path="/scenario/:id" element={<ScenarioPage />} />
           <Route path="/scenario" element={<ScenarioPage />} />
+          <Route path="/study/:id" element={<Navigate to="pre-study-questions" replace />} />
           <Route path="/study/:id/pre-study-questions" element={<PreStudyQuestionsPage />} />
           <Route path="/study/:id/scenario/:scenarioNumber" element={<StudyScenarioPage />} />
           <Route path="/study/:id/post-study-questions" element={<PostStudyQuestionsPage />} />

@@ -172,7 +172,7 @@ export default function StudyProgressBar({ studyId }: StudyProgressBarProps) {
             onClick={() => handleStepClick('post-study')}
           >
             <div className="progress-step-indicator">
-              {(currentPageType === 'post-study' || hasVisitedPostStudy) ? '✓' : ''}
+              {(currentPageType === 'post-study') ? '✓' : progress.total_scenarios + 1}
             </div>
             <span className="progress-step-label">Conclusion</span>
           </div>

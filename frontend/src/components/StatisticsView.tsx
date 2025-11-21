@@ -419,9 +419,11 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
                 const formattedPercentage = formatPercentage(percentage)
                 return (
                   <div className="agreement-message">
-                    {agreementCount === 0 && otherRespondents > 0 && <strong>Hot take! </strong>}
-                    <strong>{formattedPercentage}% of respondents chose the same spot as you.</strong>
-                    {otherRespondents === 0 && <strong> (You're the first respondent!)</strong>}
+                    {agreementCount === 0 ? (
+                        <strong>Hot take! You're the first respondent to choose this spot.</strong>
+                    ) : (
+                        <strong>{formattedPercentage}% of respondents chose the same spot as you.</strong>
+                    )}
                   </div>
                 )
               })()}
