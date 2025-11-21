@@ -634,12 +634,14 @@ async def verify_link(
     
     # Set session cookie
     # Match cookie expiration to token expiration (30 days default)
+    # For cross-origin requests (Vercel frontend to EC2 backend), use samesite="none" with secure=True
+    is_production = os.getenv("ENVIRONMENT") == "production"
     response.set_cookie(
         key="session_token",
         value=access_token,
         httponly=True,
-        secure=os.getenv("ENVIRONMENT") == "production",  # HTTPS only in production
-        samesite="lax",
+        secure=is_production,  # HTTPS only in production
+        samesite="none" if is_production else "lax",  # Allow cross-origin cookies in production
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert minutes to seconds
     )
     
@@ -702,12 +704,14 @@ async def verify_token(
     
     # Set session cookie
     # Match cookie expiration to token expiration (30 days default)
+    # For cross-origin requests (Vercel frontend to EC2 backend), use samesite="none" with secure=True
+    is_production = os.getenv("ENVIRONMENT") == "production"
     response.set_cookie(
         key="session_token",
         value=access_token,
         httponly=True,
-        secure=os.getenv("ENVIRONMENT") == "production",
-        samesite="lax",
+        secure=is_production,  # HTTPS only in production
+        samesite="none" if is_production else "lax",  # Allow cross-origin cookies in production
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert minutes to seconds
     )
     
@@ -722,7 +726,12 @@ async def logout(response: Response):
     """
     Logout user by clearing session cookie.
     """
-    response.delete_cookie(key="session_token")
+    is_production = os.getenv("ENVIRONMENT") == "production"
+    response.delete_cookie(
+        key="session_token",
+        secure=is_production,
+        samesite="none" if is_production else "lax"
+    )
     return {"message": "Logged out successfully"}
 
 
