@@ -971,6 +971,7 @@ export default function ScenarioEditor({ initialGrid }: ScenarioEditorProps) {
                   question_text: '',
                   allows_free_text: true,
                   allows_tags: true,
+                  allows_multiple_tags: true,
                   created_at: new Date().toISOString(),
                   updated_at: undefined
                 },

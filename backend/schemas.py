@@ -322,3 +322,61 @@ class PostStudyQuestionResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+# PreStudyQuestionResponse Schemas (for user answers to pre-study questions)
+class PreStudyQuestionResponseCreate(BaseModel):
+    pre_study_question_id: int = Field(..., description="ID of the pre-study question")
+    free_text_response: Optional[str] = Field(None, description="Free text response (required if question.is_required=True and allows_free_text)")
+    selected_tag_ids: Optional[List[int]] = Field(default=[], description="List of selected tag IDs (always optional)")
+
+
+class PreStudyQuestionAnswerResponse(BaseModel):
+    """Schema for returning user answers to pre-study questions (PreStudyQuestionResponse model)"""
+    id: int
+    pre_study_question_id: int
+    user_session_id: str
+    user_id: Optional[str]
+    free_text_response: Optional[str]
+    created_at: datetime
+    selected_tags: List[QuestionTagResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+# PostStudyQuestionResponse Schemas (for user answers to post-study questions)
+class PostStudyQuestionResponseCreate(BaseModel):
+    post_study_question_id: int = Field(..., description="ID of the post-study question")
+    free_text_response: Optional[str] = Field(None, description="Free text response (required if question.is_required=True and allows_free_text)")
+    selected_tag_ids: Optional[List[int]] = Field(default=[], description="List of selected tag IDs (always optional)")
+
+
+class PostStudyQuestionAnswerResponse(BaseModel):
+    """Schema for returning user answers to post-study questions (PostStudyQuestionResponse model)"""
+    id: int
+    post_study_question_id: int
+    user_session_id: str
+    user_id: Optional[str]
+    free_text_response: Optional[str]
+    created_at: datetime
+    selected_tags: List[QuestionTagResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
+# Study Progress Schema
+class StudyProgressResponse(BaseModel):
+    study_id: int
+    user_session_id: str
+    current_page_type: Optional[Literal["pre-study", "scenario", "post-study"]] = Field(None, description="Type of current page reached")
+    current_page_number: Optional[int] = Field(None, description="Page number reached (scenario number if type is 'scenario', otherwise None)")
+    pre_study_completed: bool = Field(False, description="Whether pre-study questions are completed")
+    scenarios_completed: int = Field(0, description="Number of scenarios completed")
+    total_scenarios: int = Field(0, description="Total number of scenarios in the study")
+    post_study_completed: bool = Field(False, description="Whether post-study questions are completed")
+    study_completed: bool = Field(False, description="Whether the entire study is completed")
+
+    class Config:
+        from_attributes = True
+

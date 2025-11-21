@@ -39,7 +39,8 @@ from database import Base
 from models import (
     TrainConfiguration, UserResponse, ScenarioGroup, ScenarioGroupItem, User,
     EmailVerification, ScenarioGroupEditor, Study, Question, PostResponseQuestion,
-    PreStudyQuestion, PostStudyQuestion, QuestionTag, QuestionTagAssignment, QuestionResponse, QuestionResponseTag
+    PreStudyQuestion, PostStudyQuestion, QuestionTag, QuestionTagAssignment, QuestionResponse, QuestionResponseTag,
+    PreStudyQuestionResponse, PreStudyQuestionResponseTag, PostStudyQuestionResponse, PostStudyQuestionResponseTag
 )
 target_metadata = Base.metadata
 

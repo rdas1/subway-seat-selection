@@ -13,7 +13,8 @@ from database import init_db, close_db, get_db
 from models import (
     Base, TrainConfiguration, UserResponse, ScenarioGroup, ScenarioGroupItem, User, 
     EmailVerification, ScenarioGroupEditor, Study, Question, PostResponseQuestion, 
-    PreStudyQuestion, PostStudyQuestion, QuestionTag, QuestionTagAssignment, QuestionResponse, QuestionResponseTag
+    PreStudyQuestion, PostStudyQuestion, QuestionTag, QuestionTagAssignment, QuestionResponse, QuestionResponseTag,
+    PreStudyQuestionResponse, PreStudyQuestionResponseTag, PostStudyQuestionResponse, PostStudyQuestionResponseTag
 )
 
 # Default tags that should be available for the default question
@@ -59,7 +60,12 @@ from schemas import (
     PreStudyQuestionCreate,
     PreStudyQuestionResponse,
     PostStudyQuestionCreate,
-    PostStudyQuestionResponse
+    PostStudyQuestionResponse,
+    PreStudyQuestionResponseCreate,
+    PreStudyQuestionAnswerResponse,
+    PostStudyQuestionResponseCreate,
+    PostStudyQuestionAnswerResponse,
+    StudyProgressResponse
 )
 from services.email import send_verification_email
 from utils.auth import create_access_token, generate_verification_token, generate_verification_code, ACCESS_TOKEN_EXPIRE_MINUTES
@@ -2449,6 +2455,607 @@ async def delete_post_study_question(
     await db.commit()
     
     return None
+
+
+# Pre-Study Question Response Endpoints (Public - for study participants)
+
+@app.post("/studies/{study_id}/pre-study-question-responses", response_model=List[PreStudyQuestionAnswerResponse], status_code=status.HTTP_201_CREATED)
+async def submit_pre_study_question_responses(
+    study_id: int,
+    responses: List[PreStudyQuestionResponseCreate],
+    user_session_id: str = Query(..., description="User session identifier"),
+    user_id: Optional[str] = Query(None, description="Optional user ID if logged in"),
+    current_user: Optional[User] = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Submit pre-study question responses for a study.
+    Public endpoint - no authentication required, but user_id can be provided if logged in.
+    """
+    # Verify study exists
+    study_result = await db.execute(
+        select(Study).where(Study.id == study_id)
+    )
+    study = study_result.scalar_one_or_none()
+    
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    # Use current_user.id if authenticated, otherwise use provided user_id
+    final_user_id = None
+    if current_user:
+        final_user_id = str(current_user.id)
+    elif user_id:
+        final_user_id = user_id
+    
+    answer_responses = []
+    
+    for response_data in responses:
+        # Verify pre-study question exists and belongs to this study
+        pre_q_result = await db.execute(
+            select(PreStudyQuestion).where(
+                PreStudyQuestion.id == response_data.pre_study_question_id,
+                PreStudyQuestion.study_id == study_id
+            )
+            .options(selectinload(PreStudyQuestion.question))
+        )
+        pre_q = pre_q_result.scalar_one_or_none()
+        
+        if pre_q is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Pre-study question with id {response_data.pre_study_question_id} not found for this study"
+            )
+        
+        # Validate required questions
+        if pre_q.is_required:
+            if pre_q.question.allows_free_text and (not response_data.free_text_response or not response_data.free_text_response.strip()):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Free text response is required for question {pre_q.id}"
+                )
+            if pre_q.question.allows_tags and (not response_data.selected_tag_ids or len(response_data.selected_tag_ids) == 0):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"At least one tag must be selected for question {pre_q.id}"
+                )
+        
+        # Check if response already exists (upsert behavior)
+        existing_result = await db.execute(
+            select(PreStudyQuestionResponse).where(
+                PreStudyQuestionResponse.pre_study_question_id == response_data.pre_study_question_id,
+                PreStudyQuestionResponse.user_session_id == user_session_id
+            )
+        )
+        existing_response = existing_result.scalar_one_or_none()
+        
+        if existing_response:
+            # Update existing response
+            existing_response.free_text_response = response_data.free_text_response
+            existing_response.user_id = final_user_id
+            # Delete existing tags
+            existing_tags_result = await db.execute(
+                select(PreStudyQuestionResponseTag).where(
+                    PreStudyQuestionResponseTag.pre_study_question_response_id == existing_response.id
+                )
+            )
+            existing_tags = existing_tags_result.scalars().all()
+            for tag in existing_tags:
+                await db.delete(tag)
+            await db.flush()
+            answer_response = existing_response
+        else:
+            # Create new response
+            answer_response = PreStudyQuestionResponse(
+                pre_study_question_id=response_data.pre_study_question_id,
+                user_session_id=user_session_id,
+                user_id=final_user_id,
+                free_text_response=response_data.free_text_response
+            )
+            db.add(answer_response)
+            await db.flush()
+        
+        # Add selected tags
+        if response_data.selected_tag_ids:
+            for tag_id in response_data.selected_tag_ids:
+                # Verify tag exists and is assigned to the question
+                tag_result = await db.execute(
+                    select(QuestionTag).where(QuestionTag.id == tag_id)
+                )
+                tag = tag_result.scalar_one_or_none()
+                if tag is None:
+                    continue
+                
+                # Check if tag is assigned to the question
+                assignment_result = await db.execute(
+                    select(QuestionTagAssignment).where(
+                        and_(
+                            QuestionTagAssignment.question_id == pre_q.question_id,
+                            QuestionTagAssignment.tag_id == tag_id
+                        )
+                    )
+                )
+                if assignment_result.scalar_one_or_none() is None:
+                    continue  # Skip tags not assigned to this question
+                
+                response_tag = PreStudyQuestionResponseTag(
+                    pre_study_question_response_id=answer_response.id,
+                    tag_id=tag_id
+                )
+                db.add(response_tag)
+        
+        answer_responses.append(answer_response)
+    
+    await db.commit()
+    
+    # Reload with relationships
+    result_responses = []
+    for ar in answer_responses:
+        result = await db.execute(
+            select(PreStudyQuestionResponse)
+            .where(PreStudyQuestionResponse.id == ar.id)
+            .options(selectinload(PreStudyQuestionResponse.selected_tags).selectinload(PreStudyQuestionResponseTag.tag))
+        )
+        ar = result.scalar_one()
+        
+        result_responses.append(PreStudyQuestionAnswerResponse(
+            id=ar.id,
+            pre_study_question_id=ar.pre_study_question_id,
+            user_session_id=ar.user_session_id,
+            user_id=ar.user_id,
+            free_text_response=ar.free_text_response,
+            created_at=ar.created_at,
+            selected_tags=[QuestionTagResponse(
+                id=tag.tag.id,
+                tag_text=tag.tag.tag_text,
+                is_default=tag.tag.is_default,
+                created_by_user_id=tag.tag.created_by_user_id,
+                created_at=tag.tag.created_at
+            ) for tag in ar.selected_tags]
+        ))
+    
+    return result_responses
+
+
+@app.get("/studies/{study_id}/pre-study-question-responses", response_model=List[PreStudyQuestionAnswerResponse])
+async def get_pre_study_question_responses(
+    study_id: int,
+    user_session_id: str = Query(..., description="User session identifier"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get pre-study question responses for a specific session.
+    Public endpoint - no authentication required.
+    """
+    # Verify study exists
+    study_result = await db.execute(
+        select(Study).where(Study.id == study_id)
+    )
+    if study_result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    result = await db.execute(
+        select(PreStudyQuestionResponse)
+        .join(PreStudyQuestion)
+        .where(
+            PreStudyQuestion.study_id == study_id,
+            PreStudyQuestionResponse.user_session_id == user_session_id
+        )
+        .options(selectinload(PreStudyQuestionResponse.selected_tags).selectinload(PreStudyQuestionResponseTag.tag))
+    )
+    responses = result.scalars().all()
+    
+    return [PreStudyQuestionAnswerResponse(
+        id=r.id,
+        pre_study_question_id=r.pre_study_question_id,
+        user_session_id=r.user_session_id,
+        user_id=r.user_id,
+        free_text_response=r.free_text_response,
+        created_at=r.created_at,
+        selected_tags=[QuestionTagResponse(
+            id=tag.tag.id,
+            tag_text=tag.tag.tag_text,
+            is_default=tag.tag.is_default,
+            created_by_user_id=tag.tag.created_by_user_id,
+            created_at=tag.tag.created_at
+        ) for tag in r.selected_tags]
+    ) for r in responses]
+
+
+# Post-Study Question Response Endpoints (Public - for study participants)
+
+@app.post("/studies/{study_id}/post-study-question-responses", response_model=List[PostStudyQuestionAnswerResponse], status_code=status.HTTP_201_CREATED)
+async def submit_post_study_question_responses(
+    study_id: int,
+    responses: List[PostStudyQuestionResponseCreate],
+    user_session_id: str = Query(..., description="User session identifier"),
+    user_id: Optional[str] = Query(None, description="Optional user ID if logged in"),
+    current_user: Optional[User] = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Submit post-study question responses for a study.
+    Public endpoint - no authentication required, but user_id can be provided if logged in.
+    """
+    # Verify study exists
+    study_result = await db.execute(
+        select(Study).where(Study.id == study_id)
+    )
+    study = study_result.scalar_one_or_none()
+    
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    # Use current_user.id if authenticated, otherwise use provided user_id
+    final_user_id = None
+    if current_user:
+        final_user_id = str(current_user.id)
+    elif user_id:
+        final_user_id = user_id
+    
+    answer_responses = []
+    
+    for response_data in responses:
+        # Verify post-study question exists and belongs to this study
+        post_q_result = await db.execute(
+            select(PostStudyQuestion).where(
+                PostStudyQuestion.id == response_data.post_study_question_id,
+                PostStudyQuestion.study_id == study_id
+            )
+            .options(selectinload(PostStudyQuestion.question))
+        )
+        post_q = post_q_result.scalar_one_or_none()
+        
+        if post_q is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Post-study question with id {response_data.post_study_question_id} not found for this study"
+            )
+        
+        # Validate required questions
+        if post_q.is_required:
+            if post_q.question.allows_free_text and (not response_data.free_text_response or not response_data.free_text_response.strip()):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Free text response is required for question {post_q.id}"
+                )
+            if post_q.question.allows_tags and (not response_data.selected_tag_ids or len(response_data.selected_tag_ids) == 0):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"At least one tag must be selected for question {post_q.id}"
+                )
+        
+        # Check if response already exists (upsert behavior)
+        existing_result = await db.execute(
+            select(PostStudyQuestionResponse).where(
+                PostStudyQuestionResponse.post_study_question_id == response_data.post_study_question_id,
+                PostStudyQuestionResponse.user_session_id == user_session_id
+            )
+        )
+        existing_response = existing_result.scalar_one_or_none()
+        
+        if existing_response:
+            # Update existing response
+            existing_response.free_text_response = response_data.free_text_response
+            existing_response.user_id = final_user_id
+            # Delete existing tags
+            existing_tags_result = await db.execute(
+                select(PostStudyQuestionResponseTag).where(
+                    PostStudyQuestionResponseTag.post_study_question_response_id == existing_response.id
+                )
+            )
+            existing_tags = existing_tags_result.scalars().all()
+            for tag in existing_tags:
+                await db.delete(tag)
+            await db.flush()
+            answer_response = existing_response
+        else:
+            # Create new response
+            answer_response = PostStudyQuestionResponse(
+                post_study_question_id=response_data.post_study_question_id,
+                user_session_id=user_session_id,
+                user_id=final_user_id,
+                free_text_response=response_data.free_text_response
+            )
+            db.add(answer_response)
+            await db.flush()
+        
+        # Add selected tags
+        if response_data.selected_tag_ids:
+            for tag_id in response_data.selected_tag_ids:
+                # Verify tag exists and is assigned to the question
+                tag_result = await db.execute(
+                    select(QuestionTag).where(QuestionTag.id == tag_id)
+                )
+                tag = tag_result.scalar_one_or_none()
+                if tag is None:
+                    continue
+                
+                # Check if tag is assigned to the question
+                assignment_result = await db.execute(
+                    select(QuestionTagAssignment).where(
+                        and_(
+                            QuestionTagAssignment.question_id == post_q.question_id,
+                            QuestionTagAssignment.tag_id == tag_id
+                        )
+                    )
+                )
+                if assignment_result.scalar_one_or_none() is None:
+                    continue  # Skip tags not assigned to this question
+                
+                response_tag = PostStudyQuestionResponseTag(
+                    post_study_question_response_id=answer_response.id,
+                    tag_id=tag_id
+                )
+                db.add(response_tag)
+        
+        answer_responses.append(answer_response)
+    
+    await db.commit()
+    
+    # Reload with relationships
+    result_responses = []
+    for ar in answer_responses:
+        result = await db.execute(
+            select(PostStudyQuestionResponse)
+            .where(PostStudyQuestionResponse.id == ar.id)
+            .options(selectinload(PostStudyQuestionResponse.selected_tags).selectinload(PostStudyQuestionResponseTag.tag))
+        )
+        ar = result.scalar_one()
+        
+        result_responses.append(PostStudyQuestionAnswerResponse(
+            id=ar.id,
+            post_study_question_id=ar.post_study_question_id,
+            user_session_id=ar.user_session_id,
+            user_id=ar.user_id,
+            free_text_response=ar.free_text_response,
+            created_at=ar.created_at,
+            selected_tags=[QuestionTagResponse(
+                id=tag.tag.id,
+                tag_text=tag.tag.tag_text,
+                is_default=tag.tag.is_default,
+                created_by_user_id=tag.tag.created_by_user_id,
+                created_at=tag.tag.created_at
+            ) for tag in ar.selected_tags]
+        ))
+    
+    return result_responses
+
+
+@app.get("/studies/{study_id}/post-study-question-responses", response_model=List[PostStudyQuestionAnswerResponse])
+async def get_post_study_question_responses(
+    study_id: int,
+    user_session_id: str = Query(..., description="User session identifier"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get post-study question responses for a specific session.
+    Public endpoint - no authentication required.
+    """
+    # Verify study exists
+    study_result = await db.execute(
+        select(Study).where(Study.id == study_id)
+    )
+    if study_result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    result = await db.execute(
+        select(PostStudyQuestionResponse)
+        .join(PostStudyQuestion)
+        .where(
+            PostStudyQuestion.study_id == study_id,
+            PostStudyQuestionResponse.user_session_id == user_session_id
+        )
+        .options(selectinload(PostStudyQuestionResponse.selected_tags).selectinload(PostStudyQuestionResponseTag.tag))
+    )
+    responses = result.scalars().all()
+    
+    return [PostStudyQuestionAnswerResponse(
+        id=r.id,
+        post_study_question_id=r.post_study_question_id,
+        user_session_id=r.user_session_id,
+        user_id=r.user_id,
+        free_text_response=r.free_text_response,
+        created_at=r.created_at,
+        selected_tags=[QuestionTagResponse(
+            id=tag.tag.id,
+            tag_text=tag.tag.tag_text,
+            is_default=tag.tag.is_default,
+            created_by_user_id=tag.tag.created_by_user_id,
+            created_at=tag.tag.created_at
+        ) for tag in r.selected_tags]
+    ) for r in responses]
+
+
+# Study Progress Endpoints (Public - for study participants)
+
+@app.get("/studies/{study_id}/progress", response_model=StudyProgressResponse)
+async def get_study_progress(
+    study_id: int,
+    user_session_id: str = Query(..., description="User session identifier"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get progress for a study participant session.
+    Returns information about which page they've reached and completion status.
+    Public endpoint - no authentication required.
+    """
+    # Verify study exists and load scenario group
+    study_result = await db.execute(
+        select(Study)
+        .where(Study.id == study_id)
+        .options(selectinload(Study.scenario_group).selectinload(ScenarioGroup.items).selectinload(ScenarioGroupItem.train_configuration))
+    )
+    study = study_result.scalar_one_or_none()
+    
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    # Get scenario group items (ordered)
+    scenario_items = sorted(study.scenario_group.items, key=lambda x: x.order)
+    total_scenarios = len(scenario_items)
+    
+    # Check pre-study completion
+    pre_study_questions_result = await db.execute(
+        select(PreStudyQuestion).where(PreStudyQuestion.study_id == study_id)
+    )
+    pre_study_questions = pre_study_questions_result.scalars().all()
+    required_pre_study = [q for q in pre_study_questions if q.is_required]
+    
+    pre_study_responses_result = await db.execute(
+        select(PreStudyQuestionResponse).where(
+            PreStudyQuestionResponse.user_session_id == user_session_id,
+            PreStudyQuestionResponse.pre_study_question_id.in_([q.id for q in required_pre_study])
+        )
+    )
+    pre_study_responses = pre_study_responses_result.scalars().all()
+    pre_study_completed = len(pre_study_responses) == len(required_pre_study) if required_pre_study else True
+    
+    # Check scenario completion (need seat selection + required post-response questions)
+    scenarios_completed = 0
+    for item in scenario_items:
+        # Check if user has a seat selection for this scenario
+        user_response_result = await db.execute(
+            select(UserResponse).where(
+                UserResponse.train_configuration_id == item.train_configuration_id,
+                UserResponse.user_session_id == user_session_id
+            )
+        )
+        user_response = user_response_result.scalar_one_or_none()
+        
+        if user_response:
+            # Check if all required post-response questions are answered
+            post_response_questions_result = await db.execute(
+                select(PostResponseQuestion).where(
+                    PostResponseQuestion.train_configuration_id == item.train_configuration_id,
+                    PostResponseQuestion.is_required == True
+                )
+            )
+            required_post_response = post_response_questions_result.scalars().all()
+            
+            if required_post_response:
+                question_responses_result = await db.execute(
+                    select(QuestionResponse).where(
+                        QuestionResponse.user_response_id == user_response.id,
+                        QuestionResponse.post_response_question_id.in_([q.id for q in required_post_response])
+                    )
+                )
+                question_responses = question_responses_result.scalars().all()
+                if len(question_responses) == len(required_post_response):
+                    scenarios_completed += 1
+            else:
+                scenarios_completed += 1
+    
+    # Check post-study completion
+    post_study_questions_result = await db.execute(
+        select(PostStudyQuestion).where(PostStudyQuestion.study_id == study_id)
+    )
+    post_study_questions = post_study_questions_result.scalars().all()
+    required_post_study = [q for q in post_study_questions if q.is_required]
+    
+    post_study_responses_result = await db.execute(
+        select(PostStudyQuestionResponse).where(
+            PostStudyQuestionResponse.user_session_id == user_session_id,
+            PostStudyQuestionResponse.post_study_question_id.in_([q.id for q in required_post_study])
+        )
+    )
+    post_study_responses = post_study_responses_result.scalars().all()
+    post_study_completed = len(post_study_responses) == len(required_post_study) if required_post_study else True
+    
+    # Determine current page
+    current_page_type = None
+    current_page_number = None
+    
+    if not pre_study_completed:
+        current_page_type = "pre-study"
+    elif scenarios_completed < total_scenarios:
+        current_page_type = "scenario"
+        current_page_number = scenarios_completed + 1  # 1-indexed
+    elif not post_study_completed:
+        current_page_type = "post-study"
+    else:
+        current_page_type = "post-study"  # Completed, but still on post-study page
+        current_page_number = None
+    
+    study_completed = pre_study_completed and scenarios_completed == total_scenarios and post_study_completed
+    
+    return StudyProgressResponse(
+        study_id=study_id,
+        user_session_id=user_session_id,
+        current_page_type=current_page_type,
+        current_page_number=current_page_number,
+        pre_study_completed=pre_study_completed,
+        scenarios_completed=scenarios_completed,
+        total_scenarios=total_scenarios,
+        post_study_completed=post_study_completed,
+        study_completed=study_completed
+    )
+
+
+@app.get("/studies/{study_id}/scenario/{scenario_number}", response_model=TrainConfigurationResponse)
+async def get_study_scenario_by_number(
+    study_id: int,
+    scenario_number: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get a scenario from a study by its order number (1-indexed).
+    Public endpoint - no authentication required.
+    """
+    # Verify study exists and load scenario group
+    study_result = await db.execute(
+        select(Study)
+        .where(Study.id == study_id)
+        .options(selectinload(Study.scenario_group).selectinload(ScenarioGroup.items).selectinload(ScenarioGroupItem.train_configuration))
+    )
+    study = study_result.scalar_one_or_none()
+    
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    # Get scenario group items (ordered)
+    scenario_items = sorted(study.scenario_group.items, key=lambda x: x.order)
+    
+    # Convert to 0-indexed
+    scenario_index = scenario_number - 1
+    
+    if scenario_index < 0 or scenario_index >= len(scenario_items):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Scenario number {scenario_number} not found in study {study_id}"
+        )
+    
+    scenario_item = scenario_items[scenario_index]
+    train_config = scenario_item.train_configuration
+    
+    return TrainConfigurationResponse(
+        id=train_config.id,
+        name=train_config.name,
+        title=train_config.title,
+        height=train_config.height,
+        width=train_config.width,
+        tiles=train_config.tiles,
+        created_at=train_config.created_at,
+        updated_at=train_config.updated_at
+    )
 
 
 # Question Endpoints

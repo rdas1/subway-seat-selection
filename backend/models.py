@@ -224,6 +224,7 @@ class PreStudyQuestion(Base):
     # Relationships
     question = relationship("Question", back_populates="pre_study_questions")
     study = relationship("Study", back_populates="pre_study_questions")
+    question_responses = relationship("PreStudyQuestionResponse", back_populates="pre_study_question", cascade="all, delete-orphan")
     
     # Unique constraint to prevent duplicate question assignments
     __table_args__ = (
@@ -248,6 +249,7 @@ class PostStudyQuestion(Base):
     # Relationships
     question = relationship("Question", back_populates="post_study_questions")
     study = relationship("Study", back_populates="post_study_questions")
+    question_responses = relationship("PostStudyQuestionResponse", back_populates="post_study_question", cascade="all, delete-orphan")
     
     # Unique constraint to prevent duplicate question assignments
     __table_args__ = (
@@ -271,6 +273,8 @@ class QuestionTag(Base):
     created_by_user = relationship("User", back_populates="created_tags", foreign_keys=[created_by_user_id])
     tag_assignments = relationship("QuestionTagAssignment", back_populates="tag", cascade="all, delete-orphan")
     question_response_tags = relationship("QuestionResponseTag", back_populates="tag", cascade="all, delete-orphan")
+    pre_study_question_response_tags = relationship("PreStudyQuestionResponseTag", back_populates="tag", cascade="all, delete-orphan")
+    post_study_question_response_tags = relationship("PostStudyQuestionResponseTag", back_populates="tag", cascade="all, delete-orphan")
 
 
 class QuestionTagAssignment(Base):
@@ -331,5 +335,93 @@ class QuestionResponseTag(Base):
     # Unique constraint to prevent duplicate tag selections
     __table_args__ = (
         UniqueConstraint('question_response_id', 'tag_id', name='uq_question_response_tag'),
+    )
+
+
+class PreStudyQuestionResponse(Base):
+    """
+    Model for storing user responses to pre-study questions.
+    """
+    __tablename__ = "pre_study_question_responses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    pre_study_question_id = Column(Integer, ForeignKey("pre_study_questions.id"), nullable=False, index=True)
+    user_session_id = Column(String, nullable=False, index=True)
+    user_id = Column(String, nullable=True, index=True)
+    free_text_response = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    pre_study_question = relationship("PreStudyQuestion", back_populates="question_responses")
+    selected_tags = relationship("PreStudyQuestionResponseTag", back_populates="question_response", cascade="all, delete-orphan")
+    
+    # Unique constraint to prevent duplicate responses from same session
+    __table_args__ = (
+        UniqueConstraint('pre_study_question_id', 'user_session_id', name='uq_pre_study_question_response'),
+    )
+
+
+class PreStudyQuestionResponseTag(Base):
+    """
+    Junction table for linking selected tags to pre-study question responses.
+    """
+    __tablename__ = "pre_study_question_response_tags"
+
+    id = Column(Integer, primary_key=True, index=True)
+    pre_study_question_response_id = Column(Integer, ForeignKey("pre_study_question_responses.id"), nullable=False, index=True)
+    tag_id = Column(Integer, ForeignKey("question_tags.id"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    question_response = relationship("PreStudyQuestionResponse", back_populates="selected_tags")
+    tag = relationship("QuestionTag", back_populates="pre_study_question_response_tags")
+    
+    # Unique constraint to prevent duplicate tag selections
+    __table_args__ = (
+        UniqueConstraint('pre_study_question_response_id', 'tag_id', name='uq_pre_study_question_response_tag'),
+    )
+
+
+class PostStudyQuestionResponse(Base):
+    """
+    Model for storing user responses to post-study questions.
+    """
+    __tablename__ = "post_study_question_responses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    post_study_question_id = Column(Integer, ForeignKey("post_study_questions.id"), nullable=False, index=True)
+    user_session_id = Column(String, nullable=False, index=True)
+    user_id = Column(String, nullable=True, index=True)
+    free_text_response = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    post_study_question = relationship("PostStudyQuestion", back_populates="question_responses")
+    selected_tags = relationship("PostStudyQuestionResponseTag", back_populates="question_response", cascade="all, delete-orphan")
+    
+    # Unique constraint to prevent duplicate responses from same session
+    __table_args__ = (
+        UniqueConstraint('post_study_question_id', 'user_session_id', name='uq_post_study_question_response'),
+    )
+
+
+class PostStudyQuestionResponseTag(Base):
+    """
+    Junction table for linking selected tags to post-study question responses.
+    """
+    __tablename__ = "post_study_question_response_tags"
+
+    id = Column(Integer, primary_key=True, index=True)
+    post_study_question_response_id = Column(Integer, ForeignKey("post_study_question_responses.id"), nullable=False, index=True)
+    tag_id = Column(Integer, ForeignKey("question_tags.id"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    question_response = relationship("PostStudyQuestionResponse", back_populates="selected_tags")
+    tag = relationship("QuestionTag", back_populates="post_study_question_response_tags")
+    
+    # Unique constraint to prevent duplicate tag selections
+    __table_args__ = (
+        UniqueConstraint('post_study_question_response_id', 'tag_id', name='uq_post_study_question_response_tag'),
     )
 
