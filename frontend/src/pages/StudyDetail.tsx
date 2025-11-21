@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { studyApi, StudyResponse, trainConfigApi, scenarioGroupApi, PostResponseQuestionResponse, PostResponseQuestionCreate, questionApi, TagLibraryResponse, QuestionResponseResponse, TrainConfigurationResponse, preStudyQuestionApi, PreStudyQuestionResponse, PreStudyQuestionCreate } from '../services/api'
+import { studyApi, StudyResponse, trainConfigApi, scenarioGroupApi, PostResponseQuestionResponse, PostResponseQuestionCreate, questionApi, TagLibraryResponse, QuestionResponseResponse, TrainConfigurationResponse, preStudyQuestionApi, PreStudyQuestionResponse, PreStudyQuestionCreate, QuestionTagResponse } from '../services/api'
 import { Tile } from '../types/grid'
 import { useAuth } from '../contexts/AuthContext'
 import { formatRelativeTime } from '../utils/time'
@@ -75,6 +75,7 @@ export default function StudyDetail() {
   const [loadingPreStudyQuestions, setLoadingPreStudyQuestions] = useState<boolean>(false)
   const [editingPreStudyQuestion, setEditingPreStudyQuestion] = useState<PreStudyQuestionResponse | null>(null)
   const [preStudyQuestionsExpanded, setPreStudyQuestionsExpanded] = useState<boolean>(true)
+  const [showQuestionTemplates, setShowQuestionTemplates] = useState<boolean>(false)
   const titleDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const descriptionDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -693,24 +694,7 @@ export default function StudyDetail() {
                   {/* Create new question card */}
                   <div 
                     className="pre-study-question-card pre-study-question-card-create"
-                    onClick={() => {
-                      const newQuestion: PreStudyQuestionResponse = {
-                        id: -1,
-                        question_id: -1,
-                        study_id: study.id,
-                        order: preStudyQuestions.length,
-                        created_at: new Date().toISOString(),
-                        question: {
-                          id: -1,
-                          question_text: 'What is your age range?',
-                          allows_free_text: true,
-                          allows_tags: true,
-                          created_at: new Date().toISOString()
-                        },
-                        tags: []
-                      }
-                      setEditingPreStudyQuestion(newQuestion)
-                    }}
+                    onClick={() => setShowQuestionTemplates(true)}
                   >
                     <div className="pre-study-question-card-content">
                       <div className="pre-study-question-card-plus">+</div>
@@ -752,6 +736,95 @@ export default function StudyDetail() {
                     ))
                   )}
                 </div>
+                {/* Question Templates Modal */}
+                {showQuestionTemplates && (
+                  <div className="question-editor-modal-overlay" onClick={() => setShowQuestionTemplates(false)}>
+                    <div className="question-editor-modal" onClick={(e) => e.stopPropagation()}>
+                      <div className="question-editor-header">
+                        <h3>Create New Question</h3>
+                        <button onClick={() => setShowQuestionTemplates(false)} className="close-button">×</button>
+                      </div>
+                      <QuestionTemplateSelector
+                        studyId={study.id}
+                        questionOrder={preStudyQuestions.length}
+                        tagLibrary={tagLibrary}
+                        showTagLibrary={showTagLibrary}
+                        onCloseTagLibrary={() => setShowTagLibrary(false)}
+                        onCreateTag={handleCreateNewTag}
+                        onSelectTags={async (tagIds: number[]) => {
+                          // For Custom tab, tag selection is handled by PreStudyQuestionEditor's internal state
+                        }}
+                        onAddTags={async () => {
+                          const library = await questionApi.getTagLibrary()
+                          setTagLibrary(library)
+                          setShowTagLibrary(true)
+                        }}
+                        onSelectTemplate={async (template: QuestionTemplate) => {
+                          // Create tags for the template
+                          const tagObjects: QuestionTagResponse[] = []
+                          if (template.tags && template.tags.length > 0) {
+                            try {
+                              const library = await questionApi.getTagLibrary()
+                              const allTags = [...library.default_tags, ...library.your_tags, ...library.community_tags]
+                              
+                              // Find or create tags
+                              for (const tagText of template.tags) {
+                                let tag = allTags.find(t => t.tag_text.toLowerCase() === tagText.toLowerCase())
+                                if (!tag) {
+                                  // Create the tag
+                                  tag = await questionApi.createTag({ tag_text: tagText })
+                                }
+                                tagObjects.push(tag)
+                              }
+                            } catch (err) {
+                              console.error('Failed to create/find tags:', err)
+                            }
+                          }
+                          
+                          const newQuestion: PreStudyQuestionResponse = {
+                            id: -1,
+                            question_id: -1,
+                            study_id: study.id,
+                            order: preStudyQuestions.length,
+                            created_at: new Date().toISOString(),
+                            question: {
+                              id: -1,
+                              question_text: template.question_text,
+                              allows_free_text: template.allows_free_text ?? false,
+                              allows_tags: template.allows_tags ?? true,
+                              allows_multiple_tags: template.allows_multiple_tags ?? false,
+                              created_at: new Date().toISOString()
+                            },
+                            tags: tagObjects
+                          }
+                          setEditingPreStudyQuestion(newQuestion)
+                          setShowQuestionTemplates(false)
+                        }}
+                        onCancel={() => setShowQuestionTemplates(false)}
+                        onCreateBlank={() => {
+                          const newQuestion: PreStudyQuestionResponse = {
+                            id: -1,
+                            question_id: -1,
+                            study_id: study.id,
+                            order: preStudyQuestions.length,
+                            created_at: new Date().toISOString(),
+                            question: {
+                              id: -1,
+                              question_text: '',
+                              allows_free_text: true,
+                              allows_tags: true,
+                              allows_multiple_tags: true,
+                              created_at: new Date().toISOString()
+                            },
+                            tags: []
+                          }
+                          setEditingPreStudyQuestion(newQuestion)
+                          setShowQuestionTemplates(false)
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
                 {/* Question Editor Modal */}
                 {editingPreStudyQuestion && (
                   <div className="question-editor-modal-overlay" onClick={() => setEditingPreStudyQuestion(null)}>
@@ -1264,6 +1337,161 @@ function StudyTagLibraryModal({
   );
 }
 
+// Question Template Selector Component
+interface QuestionTemplate {
+  question_text: string;
+  allows_free_text?: boolean;
+  allows_tags?: boolean;
+  allows_multiple_tags?: boolean;
+  tags?: string[];
+}
+
+function QuestionTemplateSelector({
+  onSelectTemplate,
+  onCancel,
+  onCreateBlank,
+  studyId,
+  questionOrder,
+  tagLibrary,
+  showTagLibrary,
+  onCloseTagLibrary,
+  onCreateTag,
+  onSelectTags,
+  onAddTags
+}: {
+  onSelectTemplate: (template: QuestionTemplate) => void;
+  onCancel: () => void;
+  onCreateBlank: (updates?: PreStudyQuestionCreate) => void;
+  studyId: number;
+  questionOrder: number;
+  tagLibrary?: TagLibraryResponse | null;
+  showTagLibrary?: boolean;
+  onCloseTagLibrary?: () => void;
+  onCreateTag?: (tagText: string) => Promise<any>;
+  onSelectTags?: (tagIds: number[]) => void;
+  onAddTags?: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState<'templates' | 'custom'>('templates')
+  
+  // Create a blank question for the Custom tab
+  const blankQuestion: PreStudyQuestionResponse = {
+    id: -1,
+    question_id: -1,
+    study_id: studyId,
+    order: questionOrder,
+    created_at: new Date().toISOString(),
+    question: {
+      id: -1,
+      question_text: '',
+      allows_free_text: true,
+      allows_tags: true,
+      allows_multiple_tags: true,
+      created_at: new Date().toISOString()
+    },
+    tags: []
+  }
+  
+  const templates: QuestionTemplate[] = [
+    {
+      question_text: "What is your age range?",
+      allows_free_text: false,
+      allows_tags: true,
+      allows_multiple_tags: false,
+      tags: ["18-24", "25-34", "35-44", "45-54", "55-65", "65+", "Under 18"]
+    },
+    {
+      question_text: "What is your gender?",
+      allows_free_text: false,
+      allows_tags: true,
+      allows_multiple_tags: false,
+      tags: ["Man", "Woman", "Non-binary", "Prefer not to say"]
+    },
+    {
+      question_text: "What is your highest level of education?",
+      allows_free_text: false,
+      allows_tags: true,
+      allows_multiple_tags: false,
+      tags: ["High school or less", "Some college", "Bachelor's degree", "Master's degree", "Doctorate or professional degree"]
+    },
+    {
+      question_text: "How often do you use public transportation?",
+      allows_free_text: false,
+      allows_tags: true,
+      allows_multiple_tags: false,
+      tags: ["Daily", "Several times a week", "Once a week", "A few times a month", "Rarely", "Never"]
+    }
+  ]
+
+  return (
+    <div className="question-templates-content">
+      <div className="question-templates-tabs">
+        <button
+          className={`question-templates-tab ${activeTab === 'templates' ? 'active' : ''}`}
+          onClick={() => setActiveTab('templates')}
+        >
+          Templates
+        </button>
+        <button
+          className={`question-templates-tab ${activeTab === 'custom' ? 'active' : ''}`}
+          onClick={() => setActiveTab('custom')}
+        >
+          Custom
+        </button>
+      </div>
+      
+      {activeTab === 'templates' && (
+        <div className="question-templates-grid">
+          {templates.map((template, index) => (
+            <div
+              key={index}
+              className="question-template-card"
+              onClick={() => onSelectTemplate(template)}
+            >
+              <h4>{template.question_text}</h4>
+              {template.tags && template.tags.length > 0 && (
+                <div className="question-template-tags">
+                  {template.tags.slice(0, 3).map((tag, i) => (
+                    <span key={i} className="template-tag-badge">{tag}</span>
+                  ))}
+                  {template.tags.length > 3 && (
+                    <span className="template-tag-badge">+{template.tags.length - 3} more</span>
+                  )}
+                </div>
+              )}
+              <div className="question-template-info">
+                {template.allows_multiple_tags === false && (
+                  <span className="template-info-badge">Single-select</span>
+                )}
+                {!template.allows_free_text && (
+                  <span className="template-info-badge">Tags only</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {activeTab === 'custom' && (
+        <div className="question-custom-tab">
+          <PreStudyQuestionEditor
+            question={blankQuestion}
+            onSave={(updates) => {
+              onCreateBlank(updates)
+            }}
+            onCancel={onCancel}
+            onAddTags={onAddTags || (async () => {})}
+            tagLibrary={tagLibrary}
+            showTagLibrary={showTagLibrary}
+            onCloseTagLibrary={onCloseTagLibrary}
+            onCreateTag={onCreateTag}
+            onSelectTags={onSelectTags}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 // PreStudyQuestion Editor Component
 function PreStudyQuestionEditor({
   question,
@@ -1290,8 +1518,16 @@ function PreStudyQuestionEditor({
   const [allowsFreeText, setAllowsFreeText] = useState(question.question.allows_free_text)
   const [allowsTags, setAllowsTags] = useState(question.question.allows_tags)
   const [allowsMultipleTags, setAllowsMultipleTags] = useState(question.question.allows_multiple_tags ?? true)
+  const [currentTags, setCurrentTags] = useState<QuestionTagResponse[]>(question.tags || [])
   
   const isNewQuestion = question.id === -1
+  
+  // Update currentTags when question.tags changes (for existing questions)
+  useEffect(() => {
+    if (!isNewQuestion) {
+      setCurrentTags(question.tags || [])
+    }
+  }, [question.tags, isNewQuestion])
   
   const handleSave = () => {
     const updates: PreStudyQuestionCreate = {
@@ -1299,9 +1535,23 @@ function PreStudyQuestionEditor({
       allows_free_text: allowsFreeText,
       allows_tags: allowsTags,
       allows_multiple_tags: allowsTags ? allowsMultipleTags : true,
-      tag_ids: question.tags.map(t => t.id)
+      tag_ids: currentTags.map(t => t.id)
     }
     onSave(updates)
+  }
+  
+  const handleTagSelection = async (tagIds: number[]) => {
+    if (tagLibrary) {
+      const allTags = [...tagLibrary.default_tags, ...tagLibrary.your_tags, ...tagLibrary.community_tags]
+      const newTags = tagIds.map(id => {
+        const tag = allTags.find(t => t.id === id)
+        return tag || { id, tag_text: '', is_default: false, created_at: new Date().toISOString() }
+      })
+      setCurrentTags(newTags)
+    }
+    if (onSelectTags) {
+      await onSelectTags(tagIds)
+    }
   }
   
   return (
@@ -1354,20 +1604,20 @@ function PreStudyQuestionEditor({
       )}
       {allowsTags && (
         <div className="form-group">
-          {question.tags.length > 0 && (
+          {currentTags.length > 0 && (
             <div className="question-tags">
               <label>Tags</label>
               <div className="tags-list">
-                {question.tags.map((tag) => (
+                {currentTags.map((tag) => (
                   <span key={tag.id} className="tag-badge">
-                    {tag.tag_text}
-                    {question.id !== -1 && onSelectTags && (
+                    {tag.tag_text || `Tag ${tag.id}`}
+                    {onSelectTags && (
                       <button
                         onClick={async (e) => {
                           e.stopPropagation()
-                          const currentTagIds = question.tags.map(t => t.id)
+                          const currentTagIds = currentTags.map(t => t.id)
                           const newTagIds = currentTagIds.filter(id => id !== tag.id)
-                          await onSelectTags(newTagIds)
+                          await handleTagSelection(newTagIds)
                         }}
                         className="tag-remove"
                         aria-label="Remove tag"
@@ -1381,7 +1631,7 @@ function PreStudyQuestionEditor({
             </div>
           )}
           <button onClick={onAddTags} className="add-tags-button">
-            {question.tags.length > 0 ? 'Add More Tags' : 'Add Tags'}
+            {currentTags.length > 0 ? 'Add More Tags' : 'Add Tags'}
           </button>
         </div>
       )}
@@ -1404,8 +1654,8 @@ function PreStudyQuestionEditor({
             </div>
             <StudyTagLibraryModal
               library={tagLibrary}
-              currentTagIds={question.tags.map(t => t.id)}
-              onSelectTags={onSelectTags}
+              currentTagIds={currentTags.map(t => t.id)}
+              onSelectTags={handleTagSelection}
               onCreateTag={onCreateTag}
               onClose={onCloseTagLibrary}
             />
