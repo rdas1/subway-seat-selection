@@ -413,8 +413,8 @@ export default function ScenarioPage() {
         <div className="main-header">
           {showResults && statistics ? (
             <>
+              <p className="scenario-title"><i>Scenario {id}{scenarioTitle ? `: "${scenarioTitle}"` : ''}</i></p>
               <h1>Results</h1>
-              {scenarioName && <h2>{scenarioName}</h2>}
             </>
           ) : grid ? (
             <>

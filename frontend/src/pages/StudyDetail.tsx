@@ -289,6 +289,8 @@ export default function StudyDetail() {
       question_text: updates.question_text ?? question.question.question_text,
       allows_free_text: updates.allows_free_text ?? question.question.allows_free_text,
       allows_tags: updates.allows_tags ?? question.question.allows_tags,
+      allows_multiple_tags: updates.allows_multiple_tags ?? question.question.allows_multiple_tags,
+      is_required: updates.is_required ?? question.is_required,
       order: updates.order ?? question.order,
       tag_ids: updates.tag_ids ?? question.tags.map(t => t.id)
     }
@@ -343,6 +345,7 @@ export default function StudyDetail() {
       allows_free_text: updates.allows_free_text ?? question.question.allows_free_text,
       allows_tags: updates.allows_tags ?? question.question.allows_tags,
       allows_multiple_tags: updates.allows_multiple_tags ?? question.question.allows_multiple_tags,
+      is_required: updates.is_required ?? question.is_required,
       tag_ids: updates.tag_ids ?? question.tags.map(t => t.id)
     }
     
@@ -724,9 +727,19 @@ export default function StudyDetail() {
   return (
     <div className="study-detail">
       <div className="study-detail-container">
-        <button onClick={() => navigate('/study-builder')} className="back-button">
-          ← Back
-        </button>
+        <div className="study-detail-header">
+          <button onClick={() => navigate('/study-builder')} className="back-button">
+            ← Back
+          </button>
+          <div className="study-detail-header-actions">
+            <button className="preview-button">
+              Preview
+            </button>
+            <button className="share-button">
+              Share
+            </button>
+          </div>
+        </div>
         {(saving || study.updated_at) && (
           <div className="last-saved-indicator">
             {saving ? (
@@ -786,7 +799,7 @@ export default function StudyDetail() {
                     <div className="loading-message">Loading questions...</div>
                   ) : (
                     preStudyQuestions.map((question) => (
-                      <div key={question.id} className="pre-study-question-card">
+                      <div key={question.id} className="pre-study-question-card" onClick={() => setEditingPreStudyQuestion(question)}>
                         <button
                           className="pre-study-question-card-delete"
                           onClick={(e) => {
@@ -800,10 +813,13 @@ export default function StudyDetail() {
                           ×
                         </button>
                         <div 
-                          className="pre-study-question-card-content"
-                          onClick={() => setEditingPreStudyQuestion(question)}
-                        >
-                          <h3>{question.question.question_text}</h3>
+                          className="pre-study-question-card-content"                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                            <h3 style={{ margin: 0, flex: 1 }}>{question.question.question_text}</h3>
+                            <span className={`question-required-badge ${question.is_required ? 'required' : 'optional'}`}>
+                              {question.is_required ? 'Required' : 'Optional'}
+                            </span>
+                          </div>
                           {question.tags.length > 0 && (
                             <div className="pre-study-question-tags">
                               {question.tags.map(tag => (
@@ -862,6 +878,7 @@ export default function StudyDetail() {
                             id: -1,
                             question_id: -1,
                             study_id: study.id,
+                            is_required: false,
                             order: preStudyQuestions.length,
                             created_at: new Date().toISOString(),
                             question: {
@@ -883,6 +900,7 @@ export default function StudyDetail() {
                             id: -1,
                             question_id: -1,
                             study_id: study.id,
+                            is_required: false,
                             order: preStudyQuestions.length,
                             created_at: new Date().toISOString(),
                             question: {
@@ -1210,6 +1228,7 @@ export default function StudyDetail() {
                       <QuestionTemplateSelector
                         studyId={study.id}
                         questionOrder={postStudyQuestions.length}
+                        questionType="post-study"
                         tagLibrary={tagLibrary}
                         onCreateTag={handleCreateNewTag}
                         onSelectTags={async () => {
@@ -1245,6 +1264,7 @@ export default function StudyDetail() {
                             id: -1,
                             question_id: -1,
                             study_id: study.id,
+                            is_required: false,
                             order: postStudyQuestions.length,
                             created_at: new Date().toISOString(),
                             question: {
@@ -1647,17 +1667,19 @@ function QuestionTemplateSelector({
   tagLibrary,
   onCreateTag,
   onSelectTags,
-  onAddTags
+  onAddTags,
+  questionType = 'pre-study'
 }: {
   onSelectTemplate: (template: QuestionTemplate) => void;
   onCancel: () => void;
-  onCreateBlank: (updates?: PreStudyQuestionCreate) => void;
+  onCreateBlank: (updates?: PreStudyQuestionCreate | PostStudyQuestionCreate) => void;
   studyId: number;
   questionOrder: number;
   tagLibrary?: TagLibraryResponse | null;
   onCreateTag?: (tagText: string) => Promise<any>;
   onSelectTags?: (tagIds: number[]) => void;
   onAddTags?: () => void;
+  questionType?: 'pre-study' | 'post-study';
 }) {
   const [activeTab, setActiveTab] = useState<'templates' | 'custom'>('templates')
   
@@ -1666,6 +1688,7 @@ function QuestionTemplateSelector({
     id: -1,
     question_id: -1,
     study_id: studyId,
+    is_required: false,
     order: questionOrder,
     created_at: new Date().toISOString(),
     question: {
@@ -1679,7 +1702,8 @@ function QuestionTemplateSelector({
     tags: []
   }
   
-  const templates: QuestionTemplate[] = [
+  // Pre-study question templates (demographic, structured)
+  const preStudyTemplates: QuestionTemplate[] = [
     {
       question_text: "What is your age range?",
       allows_free_text: false,
@@ -1709,6 +1733,46 @@ function QuestionTemplateSelector({
       tags: ["Daily", "Several times a week", "Once a week", "A few times a month", "Rarely", "Never"]
     }
   ]
+  
+  // Post-study question templates (open-ended, reflective)
+  const postStudyTemplates: QuestionTemplate[] = [
+    {
+      question_text: "What did you think about this study?",
+      allows_free_text: true,
+      allows_tags: true,
+      allows_multiple_tags: true,
+      tags: ["Interesting", "Confusing", "Easy to understand", "Too long", "Well-designed", "Needs improvement"]
+    },
+    {
+      question_text: "How did you feel about the scenarios?",
+      allows_free_text: true,
+      allows_tags: true,
+      allows_multiple_tags: true,
+      tags: ["Realistic", "Unrealistic", "Too crowded", "Too empty", "Good variety", "Repetitive"]
+    },
+    {
+      question_text: "What factors influenced your seat selection?",
+      allows_free_text: true,
+      allows_tags: true,
+      allows_multiple_tags: true,
+      tags: ["Comfort", "Privacy", "Accessibility", "Proximity to door", "Avoiding others", "View", "Safety"]
+    },
+    {
+      question_text: "Any additional comments or feedback?",
+      allows_free_text: true,
+      allows_tags: false,
+      allows_multiple_tags: false
+    },
+    {
+      question_text: "What would you change about this study?",
+      allows_free_text: true,
+      allows_tags: true,
+      allows_multiple_tags: true,
+      tags: ["More scenarios", "Fewer scenarios", "Different layouts", "Better instructions", "Shorter duration"]
+    }
+  ]
+  
+  const templates = questionType === 'post-study' ? postStudyTemplates : preStudyTemplates
 
   return (
     <div className="question-templates-content">
@@ -1747,11 +1811,20 @@ function QuestionTemplateSelector({
                 </div>
               )}
               <div className="question-template-info">
-                {template.allows_multiple_tags === false && (
+                {template.allows_multiple_tags === false && template.allows_tags && (
                   <span className="template-info-badge">Single-select</span>
                 )}
-                {!template.allows_free_text && (
+                {template.allows_multiple_tags && template.allows_tags && (
+                  <span className="template-info-badge">Multi-select</span>
+                )}
+                {!template.allows_free_text && template.allows_tags && (
                   <span className="template-info-badge">Tags only</span>
+                )}
+                {template.allows_free_text && !template.allows_tags && (
+                  <span className="template-info-badge">Free text only</span>
+                )}
+                {template.allows_free_text && template.allows_tags && (
+                  <span className="template-info-badge">Free text + tags</span>
                 )}
               </div>
             </div>
@@ -1800,6 +1873,7 @@ function PreStudyQuestionEditor({
   const [allowsFreeText, setAllowsFreeText] = useState(question.question.allows_free_text)
   const [allowsTags, setAllowsTags] = useState(question.question.allows_tags)
   const [allowsMultipleTags, setAllowsMultipleTags] = useState(question.question.allows_multiple_tags ?? true)
+  const [isRequired, setIsRequired] = useState(question.is_required ?? false)
   const [currentTags, setCurrentTags] = useState<QuestionTagResponse[]>(question.tags || [])
   const [tagInputValue, setTagInputValue] = useState('')
   const [showTagDropdown, setShowTagDropdown] = useState(false)
@@ -1872,6 +1946,7 @@ function PreStudyQuestionEditor({
       allows_free_text: allowsFreeText,
       allows_tags: allowsTags,
       allows_multiple_tags: allowsTags ? allowsMultipleTags : true,
+      is_required: isRequired,
       tag_ids: currentTags.map(t => t.id)
     }
     onSave(updates)
@@ -1989,6 +2064,16 @@ function PreStudyQuestionEditor({
           </label>
         </div>
       )}
+      <div className="form-group">
+        <label>
+          <input
+            type="checkbox"
+            checked={isRequired}
+            onChange={(e) => setIsRequired(e.target.checked)}
+          />
+          Required question
+        </label>
+      </div>
       {allowsTags && (
         <div className="form-group">
           <label>Tags</label>
@@ -2066,9 +2151,14 @@ function PreStudyQuestionEditor({
       <div className="question-editor-actions">
         <button onClick={onCancel} className="cancel-button">Cancel</button>
         <button 
-          onClick={handleSave} 
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            handleSave()
+          }} 
           className="save-button"
           disabled={isNewQuestion && !questionText.trim()}
+          type="button"
         >
           {isNewQuestion ? 'Create' : 'Save'}
         </button>

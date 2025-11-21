@@ -161,7 +161,7 @@ class Study(Base):
 
 class Question(Base):
     """
-    Base model for storing questions (used by PostResponseQuestion, PreResponseQuestion, etc.).
+    Base model for storing questions (used by PostResponseQuestion, PreStudyQuestion, PostStudyQuestion, etc.).
     """
     __tablename__ = "questions"
 
@@ -216,6 +216,7 @@ class PreStudyQuestion(Base):
     id = Column(Integer, primary_key=True, index=True)
     question_id = Column(Integer, ForeignKey("questions.id"), nullable=False, index=True)
     study_id = Column(Integer, ForeignKey("studies.id"), nullable=False, index=True)
+    is_required = Column(Boolean, nullable=False, default=False)
     order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -239,6 +240,7 @@ class PostStudyQuestion(Base):
     id = Column(Integer, primary_key=True, index=True)
     question_id = Column(Integer, ForeignKey("questions.id"), nullable=False, index=True)
     study_id = Column(Integer, ForeignKey("studies.id"), nullable=False, index=True)
+    is_required = Column(Boolean, nullable=False, default=False)
     order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

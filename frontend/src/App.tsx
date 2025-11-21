@@ -80,7 +80,7 @@ function Navigation() {
                     closeMobileMenu()
                   }}
                 >
-                  Scenario
+                  Scenario <p className="nav-dropdown-description">Contribute to the public scenario library!</p>
                 </Link>
                 <Link 
                   to="/study-builder" 
@@ -90,7 +90,7 @@ function Navigation() {
                     closeMobileMenu()
                   }}
                 >
-                  Study
+                  Study <p className="nav-dropdown-description">Create a study to test your own scenarios!</p>
                 </Link>
               </div>
             )}

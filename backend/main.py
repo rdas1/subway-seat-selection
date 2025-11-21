@@ -1698,6 +1698,7 @@ async def create_pre_study_question(
     pre_study_question = PreStudyQuestion(
         question_id=question.id,
         study_id=study_id,
+        is_required=question_data.is_required if hasattr(question_data, 'is_required') else False,
         order=order
     )
     db.add(pre_study_question)
@@ -1739,6 +1740,7 @@ async def create_pre_study_question(
         id=pre_study_question.id,
         question_id=pre_study_question.question_id,
         study_id=pre_study_question.study_id,
+        is_required=pre_study_question.is_required,
         order=pre_study_question.order,
         created_at=pre_study_question.created_at,
         updated_at=pre_study_question.updated_at,
@@ -1798,6 +1800,7 @@ async def get_pre_study_questions(
             id=pre_q.id,
             question_id=pre_q.question_id,
             study_id=pre_q.study_id,
+            is_required=pre_q.is_required,
             order=pre_q.order,
             created_at=pre_q.created_at,
             updated_at=pre_q.updated_at,
@@ -1866,6 +1869,10 @@ async def update_pre_study_question(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Pre-study question with id {pre_study_question_id} not found"
         )
+    
+    # Update is_required if provided
+    if hasattr(question_data, 'is_required'):
+        pre_study_question.is_required = question_data.is_required
     
     # Update order if provided
     if question_data.order is not None:
@@ -1946,6 +1953,7 @@ async def update_pre_study_question(
         id=pre_study_question.id,
         question_id=pre_study_question.question_id,
         study_id=pre_study_question.study_id,
+        is_required=pre_study_question.is_required,
         order=pre_study_question.order,
         created_at=pre_study_question.created_at,
         updated_at=pre_study_question.updated_at,
@@ -2143,6 +2151,7 @@ async def create_post_study_question(
         id=post_study_question.id,
         question_id=post_study_question.question_id,
         study_id=post_study_question.study_id,
+        is_required=post_study_question.is_required,
         order=post_study_question.order,
         created_at=post_study_question.created_at,
         updated_at=post_study_question.updated_at,
@@ -2202,6 +2211,7 @@ async def get_post_study_questions(
             id=post_q.id,
             question_id=post_q.question_id,
             study_id=post_q.study_id,
+            is_required=post_q.is_required,
             order=post_q.order,
             created_at=post_q.created_at,
             updated_at=post_q.updated_at,
@@ -2296,6 +2306,10 @@ async def update_post_study_question(
     if hasattr(question_data, 'allows_multiple_tags'):
         question.allows_multiple_tags = question_data.allows_multiple_tags
     
+    # Update is_required if provided
+    if hasattr(question_data, 'is_required'):
+        post_study_question.is_required = question_data.is_required
+    
     # Update order if provided
     if question_data.order is not None:
         post_study_question.order = question_data.order
@@ -2364,6 +2378,7 @@ async def update_post_study_question(
         id=post_study_question.id,
         question_id=post_study_question.question_id,
         study_id=post_study_question.study_id,
+        is_required=post_study_question.is_required,
         order=post_study_question.order,
         created_at=post_study_question.created_at,
         updated_at=post_study_question.updated_at,

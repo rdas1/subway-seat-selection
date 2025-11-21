@@ -575,6 +575,7 @@ export interface PreStudyQuestionCreate {
   allows_free_text?: boolean;
   allows_tags?: boolean;
   allows_multiple_tags?: boolean;
+  is_required?: boolean;
   order?: number;
   tag_ids?: number[];
 }
@@ -583,6 +584,7 @@ export interface PreStudyQuestionResponse {
   id: number;
   question_id: number;
   study_id: number;
+  is_required: boolean;
   order: number;
   created_at: string;
   updated_at?: string;
@@ -648,6 +650,7 @@ export interface PostStudyQuestionCreate {
   allows_free_text?: boolean;
   allows_tags?: boolean;
   allows_multiple_tags?: boolean;
+  is_required?: boolean;
   order?: number;
   tag_ids?: number[];
 }
@@ -656,6 +659,7 @@ export interface PostStudyQuestionResponse {
   id: number;
   question_id: number;
   study_id: number;
+  is_required: boolean;
   order: number;
   created_at: string;
   updated_at?: string;

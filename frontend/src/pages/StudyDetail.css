@@ -181,6 +181,26 @@
   margin: 0 0 0.5rem 0;
 }
 
+.question-required-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.question-required-badge.required {
+  background-color: rgba(220, 53, 69, 0.2);
+  color: #dc3545;
+  border: 1px solid #dc3545;
+}
+
+.question-required-badge.optional {
+  background-color: rgba(74, 144, 226, 0.2);
+  color: #4a90e2;
+  border: 1px solid #4a90e2;
+}
+
 .pre-study-question-card-delete {
   position: absolute;
   top: 0.5rem;
@@ -1446,6 +1466,13 @@
   margin: 0;
 }
 
+.study-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
 .back-button {
   background-color: transparent;
   border: 1px solid #565658;
@@ -1455,13 +1482,37 @@
   font-size: 1rem;
   cursor: pointer;
   transition: all 0.2s;
-  margin-bottom: 1.5rem;
   display: block;
   margin-left: 0;
   margin-right: auto;
 }
 
 .back-button:hover {
+  background-color: #3a3a3c;
+  border-color: #4a90e2;
+  color: white;
+}
+
+.study-detail-header-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.preview-button,
+.share-button {
+  background-color: transparent;
+  border: 1px solid #565658;
+  color: #d7dadc;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.preview-button:hover,
+.share-button:hover {
   background-color: #3a3a3c;
   border-color: #4a90e2;
   color: white;

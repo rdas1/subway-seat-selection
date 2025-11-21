@@ -276,6 +276,7 @@ class PreStudyQuestionCreate(BaseModel):
     allows_free_text: bool = Field(True, description="Whether the question allows free text (only used when creating new Question)")
     allows_tags: bool = Field(True, description="Whether the question allows tags (only used when creating new Question)")
     allows_multiple_tags: bool = Field(True, description="Whether the question allows multiple tag selection (only used when creating new Question, only valid if allows_tags is True)")
+    is_required: bool = Field(False, description="Whether this question is required to be answered")
     order: int = Field(0, description="Order position for the question")
     tag_ids: Optional[List[int]] = Field(default=[], description="List of tag IDs to assign to the question")
 
@@ -284,6 +285,7 @@ class PreStudyQuestionResponse(BaseModel):
     id: int
     question_id: int
     study_id: int
+    is_required: bool
     order: int
     created_at: datetime
     updated_at: Optional[datetime]
@@ -301,6 +303,7 @@ class PostStudyQuestionCreate(BaseModel):
     allows_free_text: bool = Field(True, description="Whether the question allows free text (only used when creating new Question)")
     allows_tags: bool = Field(True, description="Whether the question allows tags (only used when creating new Question)")
     allows_multiple_tags: bool = Field(True, description="Whether the question allows multiple tag selection (only used when creating new Question, only valid if allows_tags is True)")
+    is_required: bool = Field(False, description="Whether this question is required to be answered")
     order: int = Field(0, description="Order position for the question")
     tag_ids: Optional[List[int]] = Field(default=[], description="List of tag IDs to assign to the question")
 
@@ -309,6 +312,7 @@ class PostStudyQuestionResponse(BaseModel):
     id: int
     question_id: int
     study_id: int
+    is_required: bool
     order: int
     created_at: datetime
     updated_at: Optional[datetime]

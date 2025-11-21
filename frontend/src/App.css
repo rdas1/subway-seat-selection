@@ -37,6 +37,11 @@
   opacity: 0.8;
 }
 
+.nav-dropdown-description {
+  font-size: 0.75rem;
+  color: #a0a0a0;
+}
+
 .nav-hamburger {
   display: none;
   flex-direction: column;
@@ -124,6 +129,7 @@
 .nav-dropdown-toggle:hover {
   background-color: #3a3a3c;
   color: white;
+  
 }
 
 .nav-dropdown-toggle.active {
@@ -171,6 +177,9 @@
 .nav-dropdown-menu a.active {
   background-color: #4a90e2;
   color: white;
+  .nav-dropdown-description {
+    color: white;
+  }
 }
 
 .nav-dropdown-mobile {

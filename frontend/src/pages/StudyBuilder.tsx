@@ -76,7 +76,7 @@ export default function StudyBuilder() {
     return (
       <div className="study-builder">
         <div className="study-builder-container">
-          <h1>Study Builder</h1>
+          <h1>Your Studies</h1>
           {emailSent ? (
             <div>
               <div className="success-message">
