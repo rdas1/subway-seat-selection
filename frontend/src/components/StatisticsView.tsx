@@ -115,11 +115,14 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
         })
         setQuestionResponses(initialResponses)
         
-        // Load tag statistics for each question
+        // Load tag statistics for each question, filtered by user's tile selection
         const statsMap = new Map<number, Map<number, number>>()
         for (const question of questionsData) {
           try {
-            const stats = await trainConfigApi.getTagStatistics(scenarioId, question.id)
+            // Only filter by tile if user has made a selection
+            const stats = userSelection 
+              ? await trainConfigApi.getTagStatistics(scenarioId, question.id, userSelection.row, userSelection.col)
+              : await trainConfigApi.getTagStatistics(scenarioId, question.id)
             const tagCountMap = new Map<number, number>()
             stats.forEach(stat => {
               tagCountMap.set(stat.tag_id, stat.selection_count)
@@ -138,7 +141,7 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
       }
     }
     loadQuestions()
-  }, [scenarioId])
+  }, [scenarioId, userSelection])
 
   // Check if all required questions are answered (memoized)
   const areRequiredQuestionsAnswered = useMemo(() => {
@@ -305,20 +308,19 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
     const updated = new Map(questionResponses)
     const current = updated.get(questionId) || { freeText: '', selectedTagIds: [] }
     const wasSelected = current.selectedTagIds.includes(tagId)
+    const allowsMultiple = questions.find(q => q.id === questionId)?.question.allows_multiple_tags ?? true
+    
     const tagIds = wasSelected
       ? current.selectedTagIds.filter(id => id !== tagId)
-      : [...current.selectedTagIds, tagId]
+      : allowsMultiple
+        ? [...current.selectedTagIds, tagId]
+        : [tagId] // Radio button behavior - replace selection
+    
     updated.set(questionId, { ...current, selectedTagIds: tagIds })
     setQuestionResponses(updated)
     
-    // Update tag statistics in real-time
-    const updatedStats = new Map(tagStatistics)
-    const questionStats = updatedStats.get(questionId) || new Map<number, number>()
-    const currentCount = questionStats.get(tagId) || 0
-    const newCount = wasSelected ? Math.max(0, currentCount - 1) : currentCount + 1
-    questionStats.set(tagId, newCount)
-    updatedStats.set(questionId, questionStats)
-    setTagStatistics(updatedStats)
+    // Note: Tag statistics are now fetched from backend filtered by tile selection
+    // No need for real-time incrementing since counts reflect other users who selected the same tile
   }
 
   return (

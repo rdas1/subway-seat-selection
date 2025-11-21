@@ -3755,10 +3755,13 @@ async def submit_question_responses(
 async def get_tag_statistics(
     config_id: int,
     post_response_question_id: int,
+    row: int = Query(None, description="Filter by tile row (optional)"),
+    col: int = Query(None, description="Filter by tile column (optional)"),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Get tag usage statistics for a question.
+    If row and col are provided, only count tags from users who selected that tile.
     """
     # Verify post-response question exists and belongs to config
     result = await db.execute(
@@ -3778,13 +3781,29 @@ async def get_tag_statistics(
             detail=f"Post-response question with id {post_response_question_id} not found"
         )
     
-    # Get all question responses for this post-response question
-    qr_result = await db.execute(
-        select(QuestionResponse).where(
+    # Build query for question responses
+    if row is not None and col is not None:
+        # Filter by users who selected the specified tile
+        query = select(QuestionResponse).join(
+            UserResponse,
+            QuestionResponse.user_response_id == UserResponse.id
+        ).where(
+            and_(
+                QuestionResponse.post_response_question_id == post_response_question_id,
+                UserResponse.train_configuration_id == config_id,
+                UserResponse.row == row,
+                UserResponse.col == col
+            )
+        )
+    else:
+        # Get all question responses for this question
+        query = select(QuestionResponse).where(
             QuestionResponse.post_response_question_id == post_response_question_id
         )
-        .options(selectinload(QuestionResponse.selected_tags))
-    )
+    
+    query = query.options(selectinload(QuestionResponse.selected_tags))
+    
+    qr_result = await db.execute(query)
     question_responses = qr_result.scalars().all()
     
     # Count tag selections

@@ -195,8 +195,14 @@ export const trainConfigApi = {
     }
   },
 
-  async getTagStatistics(configId: number, questionId: number): Promise<TagStatisticsResponse[]> {
-    const response = await fetchWithCredentials(`${API_BASE_URL}/train-configurations/${configId}/questions/${questionId}/tag-statistics`);
+  async getTagStatistics(configId: number, questionId: number, row?: number, col?: number): Promise<TagStatisticsResponse[]> {
+    const params = new URLSearchParams();
+    if (row !== undefined && col !== undefined) {
+      params.append('row', row.toString());
+      params.append('col', col.toString());
+    }
+    const url = `${API_BASE_URL}/train-configurations/${configId}/questions/${questionId}/tag-statistics${params.toString() ? `?${params.toString()}` : ''}`;
+    const response = await fetchWithCredentials(url);
 
     if (!response.ok) {
       throw new Error('Failed to fetch tag statistics');
