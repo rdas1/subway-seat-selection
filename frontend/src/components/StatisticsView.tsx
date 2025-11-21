@@ -441,7 +441,7 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
                       }}
                     >
                       <strong>{formattedPercentage}% of all respondents chose this spot.</strong>
-                    </div>
+                  </div>
                   </>
                 )
               })()}
