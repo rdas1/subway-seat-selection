@@ -1712,11 +1712,11 @@ function QuestionTemplateSelector({
       tags: ["18-24", "25-34", "35-44", "45-54", "55-65", "65+", "Under 18"]
     },
     {
-      question_text: "What is your gender?",
+      question_text: "What is your gender identity?",
       allows_free_text: false,
       allows_tags: true,
       allows_multiple_tags: false,
-      tags: ["Man", "Woman", "Non-binary", "Prefer not to say"]
+      tags: ["Man", "Woman", "Non-binary", "Other", "Prefer not to say"]
     },
     {
       question_text: "What is your highest level of education?",

@@ -594,13 +594,21 @@
   transition: all 0.2s ease;
 }
 
-.continue-button:hover {
+.continue-button:hover:not(:disabled) {
   /* background-color: #ff8c52; */
   transform: translateY(-1px);
 }
 
-.continue-button:active {
+.continue-button:active:not(:disabled) {
   transform: translateY(0);
+}
+
+.continue-button:disabled {
+  background-color: #3a3a3c;
+  color: #6b6b6d;
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
 }
 
 .clear-button {

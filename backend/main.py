@@ -3007,6 +3007,39 @@ async def get_study_progress(
     )
 
 
+@app.get("/studies/{study_id}/public", response_model=StudyResponse)
+async def get_study_public(
+    study_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get basic study information (title, description) for participants.
+    Public endpoint - no authentication required.
+    """
+    # Verify study exists
+    study_result = await db.execute(
+        select(Study).where(Study.id == study_id)
+    )
+    study = study_result.scalar_one_or_none()
+    
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    return StudyResponse(
+        id=study.id,
+        title=study.title,
+        description=study.description,
+        email=study.email,
+        scenario_group_id=study.scenario_group_id,
+        created_by_user_id=study.created_by_user_id,
+        created_at=study.created_at,
+        updated_at=study.updated_at
+    )
+
+
 @app.get("/studies/{study_id}/scenario/{scenario_number}", response_model=TrainConfigurationResponse)
 async def get_study_scenario_by_number(
     study_id: int,

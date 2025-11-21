@@ -7,6 +7,7 @@ import ScenarioPage from './pages/ScenarioPage'
 import StudyBuilder from './pages/StudyBuilder'
 import StudyDetail from './pages/StudyDetail'
 import VerificationPage from './pages/VerificationPage'
+import PreStudyQuestionsPage from './pages/PreStudyQuestionsPage'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 
 export type PlayerGender = 'man' | 'woman' | 'neutral' | 'prefer-not-to-say'
@@ -150,6 +151,7 @@ function App() {
             <Route path="/study-builder/:id" element={<StudyDetail />} />
           <Route path="/scenario/:id" element={<ScenarioPage />} />
           <Route path="/scenario" element={<ScenarioPage />} />
+          <Route path="/study/:id/pre-study-questions" element={<PreStudyQuestionsPage />} />
         </Routes>
       </div>
     </BrowserRouter>

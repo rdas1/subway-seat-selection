@@ -566,6 +566,19 @@ export const studyApi = {
       throw new Error(error.detail || 'Failed to delete study');
     }
   },
+
+  async getPublic(id: number): Promise<StudyResponse> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${id}/public`);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Study not found');
+      }
+      throw new Error('Failed to fetch study');
+    }
+
+    return response.json();
+  },
 };
 
 // PreStudyQuestion API
@@ -813,6 +826,133 @@ export const questionApi = {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ detail: 'Failed to create tag' }));
       throw new Error(error.detail || 'Failed to create tag');
+    }
+
+    return response.json();
+  },
+};
+
+// Pre-Study Question Response API
+export interface PreStudyQuestionResponseCreate {
+  pre_study_question_id: number;
+  free_text_response?: string;
+  selected_tag_ids?: number[];
+}
+
+export interface PreStudyQuestionAnswerResponse {
+  id: number;
+  pre_study_question_id: number;
+  user_session_id: string;
+  user_id?: string;
+  free_text_response?: string;
+  created_at: string;
+  selected_tags: QuestionTagResponse[];
+}
+
+export const preStudyQuestionResponseApi = {
+  async create(studyId: number, responses: PreStudyQuestionResponseCreate[], sessionId: string, userId?: string): Promise<PreStudyQuestionAnswerResponse[]> {
+    const params = new URLSearchParams();
+    params.append('user_session_id', sessionId);
+    if (userId) {
+      params.append('user_id', userId);
+    }
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${studyId}/pre-study-question-responses?${params.toString()}`, {
+      method: 'POST',
+      body: JSON.stringify(responses),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to submit pre-study question responses' }));
+      throw new Error(error.detail || 'Failed to submit pre-study question responses');
+    }
+
+    return response.json();
+  },
+
+  async getBySession(studyId: number, sessionId: string): Promise<PreStudyQuestionAnswerResponse[]> {
+    const params = new URLSearchParams();
+    params.append('user_session_id', sessionId);
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${studyId}/pre-study-question-responses?${params.toString()}`);
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch pre-study question responses');
+    }
+
+    return response.json();
+  },
+};
+
+// Post-Study Question Response API
+export interface PostStudyQuestionResponseCreate {
+  post_study_question_id: number;
+  free_text_response?: string;
+  selected_tag_ids?: number[];
+}
+
+export interface PostStudyQuestionAnswerResponse {
+  id: number;
+  post_study_question_id: number;
+  user_session_id: string;
+  user_id?: string;
+  free_text_response?: string;
+  created_at: string;
+  selected_tags: QuestionTagResponse[];
+}
+
+export const postStudyQuestionResponseApi = {
+  async create(studyId: number, responses: PostStudyQuestionResponseCreate[], sessionId: string, userId?: string): Promise<PostStudyQuestionAnswerResponse[]> {
+    const params = new URLSearchParams();
+    params.append('user_session_id', sessionId);
+    if (userId) {
+      params.append('user_id', userId);
+    }
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${studyId}/post-study-question-responses?${params.toString()}`, {
+      method: 'POST',
+      body: JSON.stringify(responses),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to submit post-study question responses' }));
+      throw new Error(error.detail || 'Failed to submit post-study question responses');
+    }
+
+    return response.json();
+  },
+
+  async getBySession(studyId: number, sessionId: string): Promise<PostStudyQuestionAnswerResponse[]> {
+    const params = new URLSearchParams();
+    params.append('user_session_id', sessionId);
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${studyId}/post-study-question-responses?${params.toString()}`);
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch post-study question responses');
+    }
+
+    return response.json();
+  },
+};
+
+// Study Progress API
+export interface StudyProgressResponse {
+  study_id: number;
+  user_session_id: string;
+  current_page_type?: 'pre-study' | 'scenario' | 'post-study';
+  current_page_number?: number;
+  pre_study_completed: boolean;
+  scenarios_completed: number;
+  total_scenarios: number;
+  post_study_completed: boolean;
+  study_completed: boolean;
+}
+
+export const studyProgressApi = {
+  async getProgress(studyId: number, sessionId: string): Promise<StudyProgressResponse> {
+    const params = new URLSearchParams();
+    params.append('user_session_id', sessionId);
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${studyId}/progress?${params.toString()}`);
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch study progress');
     }
 
     return response.json();
