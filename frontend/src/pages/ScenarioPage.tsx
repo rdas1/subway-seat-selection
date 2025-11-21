@@ -88,7 +88,7 @@ export default function ScenarioPage() {
           console.log('Random scenario loaded with ID:', config.id, 'Name:', config.name, 'Title:', config.title)
           
           // No need to check for previous responses in regular scenarios
-            setHasPreviousResponse(false)
+          setHasPreviousResponse(false)
             
             // Update URL to include scenario ID
             navigate(`/scenario/${config.id}`, { replace: true })
@@ -145,7 +145,7 @@ export default function ScenarioPage() {
         console.log('Scenario ID set for responses:', scenarioId)
         
         // No need to check for previous responses in regular scenarios
-          setHasPreviousResponse(false)
+        setHasPreviousResponse(false)
         
         // Trigger slide-in animation
         setGridAnimation('slidingIn')
