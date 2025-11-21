@@ -58,9 +58,9 @@ from schemas import (
     TagStatisticsResponse,
     TagLibraryResponse,
     PreStudyQuestionCreate,
-    PreStudyQuestionResponse,
+    PreStudyQuestionResponse as PreStudyQuestionResponseSchema,
     PostStudyQuestionCreate,
-    PostStudyQuestionResponse,
+    PostStudyQuestionResponse as PostStudyQuestionResponseSchema,
     PreStudyQuestionResponseCreate,
     PreStudyQuestionAnswerResponse,
     PostStudyQuestionResponseCreate,
@@ -1622,7 +1622,7 @@ async def delete_study(
 
 # PreStudyQuestion Endpoints
 
-@app.post("/studies/{study_id}/pre-study-questions", response_model=PreStudyQuestionResponse, status_code=status.HTTP_201_CREATED)
+@app.post("/studies/{study_id}/pre-study-questions", response_model=PreStudyQuestionResponseSchema, status_code=status.HTTP_201_CREATED)
 async def create_pre_study_question(
     study_id: int,
     question_data: PreStudyQuestionCreate,
@@ -1742,7 +1742,7 @@ async def create_pre_study_question(
     tag_assignments = tag_assignments_result.scalars().all()
     tags = [assignment.tag for assignment in tag_assignments]
     
-    return PreStudyQuestionResponse(
+    return PreStudyQuestionResponseSchema(
         id=pre_study_question.id,
         question_id=pre_study_question.question_id,
         study_id=pre_study_question.study_id,
@@ -1769,7 +1769,7 @@ async def create_pre_study_question(
     )
 
 
-@app.get("/studies/{study_id}/pre-study-questions", response_model=List[PreStudyQuestionResponse])
+@app.get("/studies/{study_id}/pre-study-questions", response_model=List[PreStudyQuestionResponseSchema])
 async def get_pre_study_questions(
     study_id: int,
     db: AsyncSession = Depends(get_db)
@@ -1802,7 +1802,7 @@ async def get_pre_study_questions(
     responses = []
     for pre_q in pre_questions:
         tags = [assignment.tag for assignment in pre_q.question.tag_assignments]
-        responses.append(PreStudyQuestionResponse(
+        responses.append(PreStudyQuestionResponseSchema(
             id=pre_q.id,
             question_id=pre_q.question_id,
             study_id=pre_q.study_id,
@@ -1831,7 +1831,7 @@ async def get_pre_study_questions(
     return responses
 
 
-@app.put("/studies/{study_id}/pre-study-questions/{pre_study_question_id}", response_model=PreStudyQuestionResponse)
+@app.put("/studies/{study_id}/pre-study-questions/{pre_study_question_id}", response_model=PreStudyQuestionResponseSchema)
 async def update_pre_study_question(
     study_id: int,
     pre_study_question_id: int,
@@ -1955,7 +1955,7 @@ async def update_pre_study_question(
     tag_assignments = tag_assignments_result.scalars().all()
     tags = [assignment.tag for assignment in tag_assignments]
     
-    return PreStudyQuestionResponse(
+    return PreStudyQuestionResponseSchema(
         id=pre_study_question.id,
         question_id=pre_study_question.question_id,
         study_id=pre_study_question.study_id,
@@ -2034,7 +2034,7 @@ async def delete_pre_study_question(
 
 # PostStudyQuestion Endpoints
 
-@app.post("/studies/{study_id}/post-study-questions", response_model=PostStudyQuestionResponse, status_code=status.HTTP_201_CREATED)
+@app.post("/studies/{study_id}/post-study-questions", response_model=PostStudyQuestionResponseSchema, status_code=status.HTTP_201_CREATED)
 async def create_post_study_question(
     study_id: int,
     question_data: PostStudyQuestionCreate,
@@ -2153,7 +2153,7 @@ async def create_post_study_question(
     tag_assignments = tag_assignments_result.scalars().all()
     tags = [assignment.tag for assignment in tag_assignments]
     
-    return PostStudyQuestionResponse(
+    return PostStudyQuestionResponseSchema(
         id=post_study_question.id,
         question_id=post_study_question.question_id,
         study_id=post_study_question.study_id,
@@ -2180,7 +2180,7 @@ async def create_post_study_question(
     )
 
 
-@app.get("/studies/{study_id}/post-study-questions", response_model=List[PostStudyQuestionResponse])
+@app.get("/studies/{study_id}/post-study-questions", response_model=List[PostStudyQuestionResponseSchema])
 async def get_post_study_questions(
     study_id: int,
     db: AsyncSession = Depends(get_db)
@@ -2213,7 +2213,7 @@ async def get_post_study_questions(
     responses = []
     for post_q in post_questions:
         tags = [assignment.tag for assignment in post_q.question.tag_assignments]
-        responses.append(PostStudyQuestionResponse(
+        responses.append(PostStudyQuestionResponseSchema(
             id=post_q.id,
             question_id=post_q.question_id,
             study_id=post_q.study_id,
@@ -2242,7 +2242,7 @@ async def get_post_study_questions(
     return responses
 
 
-@app.put("/studies/{study_id}/post-study-questions/{post_study_question_id}", response_model=PostStudyQuestionResponse)
+@app.put("/studies/{study_id}/post-study-questions/{post_study_question_id}", response_model=PostStudyQuestionResponseSchema)
 async def update_post_study_question(
     study_id: int,
     post_study_question_id: int,
@@ -2380,7 +2380,7 @@ async def update_post_study_question(
     tag_assignments = tag_assignments_result.scalars().all()
     tags = [assignment.tag for assignment in tag_assignments]
     
-    return PostStudyQuestionResponse(
+    return PostStudyQuestionResponseSchema(
         id=post_study_question.id,
         question_id=post_study_question.question_id,
         study_id=post_study_question.study_id,
