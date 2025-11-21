@@ -524,7 +524,7 @@
 
 .tag-selection-checkbox:hover,
 .tag-selection-radio:hover {
-  background-color: #4a4a4c;
+  background-color: #4a4a4c !important;
   border-color: #4a90e2;
 }
 
@@ -547,7 +547,7 @@
 }
 
 .tag-selection-checkbox input[type="checkbox"]:checked + span .tag-count {
-  color: #6ba3e8;
+  color: #4a90e2 !important;
 }
   
   .question-error-message {

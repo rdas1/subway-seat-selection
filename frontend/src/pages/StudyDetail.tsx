@@ -269,6 +269,7 @@ export default function StudyDetail() {
         question_text: questionData.question_text,
         allows_free_text: questionData.allows_free_text ?? true,
         allows_tags: questionData.allows_tags ?? true,
+        allows_multiple_tags: questionData.allows_multiple_tags ?? false,
         order: preStudyQuestions.length,
         tag_ids: questionData.tag_ids ?? []
       })
@@ -2115,7 +2116,7 @@ function PreStudyQuestionEditor({
             />
             {showTagDropdown && (
               <div ref={dropdownRef} className="tag-dropdown">
-                {filteredTags.length > 0 ? (
+                {filteredTags.length > 0 && (
                   <>
                     {filteredTags.slice(0, 10).map((tag) => (
                       <div
@@ -2133,15 +2134,15 @@ function PreStudyQuestionEditor({
                       </div>
                     )}
                   </>
-                ) : tagInputValue.trim() ? (
+                )}
+                
+                {tagInputValue.trim() && (
                   <div
                     className="tag-dropdown-item tag-dropdown-create"
                     onClick={handleCreateNewTag}
                   >
                     Create "{tagInputValue.trim()}"
                   </div>
-                ) : (
-                  <div className="tag-dropdown-empty">No tags available</div>
                 )}
               </div>
             )}

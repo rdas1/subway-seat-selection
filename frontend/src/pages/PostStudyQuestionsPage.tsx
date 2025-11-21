@@ -1,20 +1,20 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { preStudyQuestionApi, PreStudyQuestionResponse, preStudyQuestionResponseApi, PreStudyQuestionResponseCreate, studyApi, StudyResponse } from '../services/api'
+import { postStudyQuestionApi, PostStudyQuestionResponse, postStudyQuestionResponseApi, PostStudyQuestionResponseCreate, studyApi, StudyResponse } from '../services/api'
 import { getSessionId } from '../utils/session'
 import { useAuth } from '../contexts/AuthContext'
 import StudyProgressBar from '../components/StudyProgressBar'
-import './PreStudyQuestionsPage.css'
+import './PostStudyQuestionsPage.css'
 import '../components/StatisticsView.css'
 
-export default function PreStudyQuestionsPage() {
+export default function PostStudyQuestionsPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
   const studyId = id ? parseInt(id, 10) : null
   
   const [study, setStudy] = useState<StudyResponse | null>(null)
-  const [questions, setQuestions] = useState<PreStudyQuestionResponse[]>([])
+  const [questions, setQuestions] = useState<PostStudyQuestionResponse[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState<boolean>(false)
@@ -38,19 +38,18 @@ export default function PreStudyQuestionsPage() {
         // Load study, questions and existing responses in parallel
         const [studyData, questionsData, responsesData] = await Promise.all([
           studyApi.getPublic(studyId).catch(() => null), // Public endpoint for participant view
-          preStudyQuestionApi.getAll(studyId),
-          preStudyQuestionResponseApi.getBySession(studyId, sessionId).catch(() => []) // Ignore errors if no responses exist
+          postStudyQuestionApi.getAll(studyId),
+          postStudyQuestionResponseApi.getBySession(studyId, sessionId).catch(() => []) // Ignore errors if no responses exist
         ])
         
         setStudy(studyData)
-        
         setQuestions(questionsData)
         
         // Initialize question responses from existing data or empty
         const initialResponses = new Map<number, { freeText: string; selectedTagIds: number[] }>()
         
         questionsData.forEach(q => {
-          const existingResponse = responsesData.find(r => r.pre_study_question_id === q.id)
+          const existingResponse = responsesData.find(r => r.post_study_question_id === q.id)
           if (existingResponse) {
             initialResponses.set(q.id, {
               freeText: existingResponse.free_text_response || '',
@@ -63,7 +62,7 @@ export default function PreStudyQuestionsPage() {
         
         setQuestionResponses(initialResponses)
       } catch (err) {
-        console.error('Failed to load pre-study questions:', err)
+        console.error('Failed to load post-study questions:', err)
         setError(err instanceof Error ? err.message : 'Failed to load questions')
       } finally {
         setLoading(false)
@@ -134,16 +133,19 @@ export default function PreStudyQuestionsPage() {
       setError(null)
       
       const sessionId = getSessionId()
-      const responses: PreStudyQuestionResponseCreate[] = Array.from(questionResponses.entries()).map(([questionId, response]) => ({
-        pre_study_question_id: questionId,
+      const responses: PostStudyQuestionResponseCreate[] = Array.from(questionResponses.entries()).map(([questionId, response]) => ({
+        post_study_question_id: questionId,
         free_text_response: response.freeText || undefined,
         selected_tag_ids: response.selectedTagIds
       }))
       
-      await preStudyQuestionResponseApi.create(studyId, responses, sessionId, user?.id ? String(user.id) : undefined)
+      await postStudyQuestionResponseApi.create(studyId, responses, sessionId, user?.id ? String(user.id) : undefined)
       
-      // Navigate to first scenario
-      navigate(`/study/${studyId}/scenario/1`)
+      // Scroll to top and show completion message
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      
+      // For now, just show a success message - could navigate to a completion page later
+      alert('Thank you for completing the study!')
     } catch (err) {
       console.error('Failed to submit responses:', err)
       setError(err instanceof Error ? err.message : 'Failed to submit responses')
@@ -154,6 +156,7 @@ export default function PreStudyQuestionsPage() {
   if (loading) {
     return (
       <div className="App">
+        {studyId && <StudyProgressBar studyId={studyId} />}
         <main className="App-main">
           <div className="main-header">
             <h1>Loading...</h1>
@@ -166,6 +169,7 @@ export default function PreStudyQuestionsPage() {
   if (error && !questions.length) {
     return (
       <div className="App">
+        {studyId && <StudyProgressBar studyId={studyId} />}
         <main className="App-main">
           <div className="main-header">
             <h1>Error</h1>
@@ -179,10 +183,9 @@ export default function PreStudyQuestionsPage() {
 
   return (
     <div className="App">
+      {studyId && <StudyProgressBar studyId={studyId} />}
       <main className="App-main">
         <div className="main-header">
-      {studyId && <StudyProgressBar studyId={studyId} />}
-    
           <h1>{study?.title || 'Study'}</h1>
           {study?.description && (
             <p style={{ color: '#d7dadc', marginTop: '0.5rem', marginBottom: '1.5rem', maxWidth: '800px', marginLeft: 'auto', marginRight: 'auto' }}>
@@ -191,7 +194,7 @@ export default function PreStudyQuestionsPage() {
           )}
           {questions.length > 0 && (
             <p style={{ color: '#a0a0a0', marginTop: study?.description ? '0.5rem' : '0.5rem', marginBottom: '1.5rem' }}>
-              Please answer the following questions before beginning the study.
+              Please answer the following questions to complete the study.
             </p>
           )}
         </div>
@@ -204,14 +207,10 @@ export default function PreStudyQuestionsPage() {
 
         {questions.length === 0 ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: '#d7dadc' }}>
-            <p>No pre-study questions for this study.</p>
-            <button 
-              className="continue-button"
-              onClick={() => navigate(`/study/${studyId}/scenario/1`)}
-              style={{ marginTop: '1rem' }}
-            >
-              Continue to First Scenario
-            </button>
+            <p>No post-study questions for this study.</p>
+            <p style={{ marginTop: '1rem', fontSize: '1.1rem', color: '#4a90e2' }}>
+              Thank you for completing the study!
+            </p>
           </div>
         ) : (
           <div className="questions-response-section">
@@ -281,7 +280,7 @@ export default function PreStudyQuestionsPage() {
             disabled={!areRequiredQuestionsAnswered || submitting}
             title={!areRequiredQuestionsAnswered ? 'Please answer all required questions' : ''}
           >
-            {submitting ? 'Submitting...' : 'Continue to Study'}
+            {submitting ? 'Submitting...' : 'Complete Study'}
           </button>
         )}
       </footer>

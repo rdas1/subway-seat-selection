@@ -579,6 +579,19 @@ export const studyApi = {
 
     return response.json();
   },
+
+  async getScenarioByOrder(studyId: number, scenarioNumber: number): Promise<TrainConfigurationResponse> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${studyId}/scenario/${scenarioNumber}`);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('Scenario not found');
+      }
+      throw new Error('Failed to fetch scenario');
+    }
+
+    return response.json();
+  },
 };
 
 // PreStudyQuestion API

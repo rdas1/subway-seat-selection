@@ -147,9 +147,20 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
         const response = questionResponses.get(question.id)
         if (!response) return false
         
+        const hasFreeText = response.freeText && response.freeText.trim().length > 0
+        const hasTags = response.selectedTagIds.length > 0
+        
         // Check if free text is required and provided
-        if (question.free_text_required && (!response.freeText || !response.freeText.trim())) {
+        if (question.free_text_required && !hasFreeText) {
           return false
+        }
+        
+        // If question allows tags and has tags available, require at least one tag OR free text
+        // (unless free text is already required above)
+        if (question.question.allows_tags && question.tags.length > 0 && !question.free_text_required) {
+          if (!hasTags && !hasFreeText) {
+            return false
+          }
         }
       }
     }
