@@ -87,6 +87,8 @@
 /* Pre-Study Questions Section */
 .pre-study-questions-section {
   margin-top: 3rem;
+  width: 100%;
+  clear: both;
 }
 
 .section-header {
@@ -268,6 +270,95 @@
   color: white;
 }
 
+.tag-input-wrapper {
+  position: relative;
+  margin-top: 0.5rem;
+}
+
+.tag-input {
+  width: 100%;
+  background-color: #2a2a2c;
+  border: 1px solid #3a3a3c;
+  border-radius: 4px;
+  color: #d7dadc;
+  font-size: 0.9rem;
+  padding: 0.5rem 0.75rem;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.tag-input:focus {
+  outline: none;
+  border-color: #4a90e2;
+  background-color: #323234;
+}
+
+.tag-input::placeholder {
+  color: #565658;
+}
+
+.tag-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: #2a2a2c;
+  border: 1px solid #3a3a3c;
+  border-radius: 4px;
+  margin-top: 0.25rem;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.tag-dropdown-item {
+  padding: 0.75rem 1rem;
+  color: #d7dadc;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.tag-dropdown-item:hover {
+  background-color: #3a3a3c;
+}
+
+.tag-dropdown-item.tag-dropdown-create {
+  color: #4a90e2;
+  font-weight: 500;
+}
+
+.tag-dropdown-item.tag-dropdown-create:hover {
+  background-color: rgba(74, 144, 226, 0.1);
+}
+
+.tag-dropdown-badge {
+  font-size: 0.75rem;
+  color: #a0a0a0;
+  background-color: #3a3a3c;
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+}
+
+.tag-dropdown-more {
+  padding: 0.5rem 1rem;
+  color: #a0a0a0;
+  font-size: 0.85rem;
+  font-style: italic;
+  text-align: center;
+}
+
+.tag-dropdown-empty {
+  padding: 0.75rem 1rem;
+  color: #a0a0a0;
+  font-style: italic;
+  text-align: center;
+}
+
 /* Question Templates */
 .question-templates-content {
   padding: 1.5rem;
@@ -405,13 +496,8 @@
 /* Scenarios Section */
 .scenarios-section {
   margin-top: 3rem;
-}
-
-.scenarios-section-title {
-  color: white;
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin: 0 0 1.5rem 0;
+  width: 100%;
+  clear: both;
 }
 
 .scenarios-grid {
@@ -1108,7 +1194,8 @@
 
 /* Reuse tag library and question editor styles from ScenarioEditor */
 .tag-library-overlay,
-.question-editor-overlay {
+.question-editor-overlay,
+.question-editor-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;

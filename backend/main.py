@@ -13,7 +13,7 @@ from database import init_db, close_db, get_db
 from models import (
     Base, TrainConfiguration, UserResponse, ScenarioGroup, ScenarioGroupItem, User, 
     EmailVerification, ScenarioGroupEditor, Study, Question, PostResponseQuestion, 
-    PreStudyQuestion, QuestionTag, QuestionTagAssignment, QuestionResponse, QuestionResponseTag
+    PreStudyQuestion, PostStudyQuestion, QuestionTag, QuestionTagAssignment, QuestionResponse, QuestionResponseTag
 )
 
 # Default tags that should be available for the default question
@@ -57,7 +57,9 @@ from schemas import (
     TagStatisticsResponse,
     TagLibraryResponse,
     PreStudyQuestionCreate,
-    PreStudyQuestionResponse
+    PreStudyQuestionResponse,
+    PostStudyQuestionCreate,
+    PostStudyQuestionResponse
 )
 from services.email import send_verification_email
 from utils.auth import create_access_token, generate_verification_token, generate_verification_code, ACCESS_TOKEN_EXPIRE_MINUTES
@@ -2011,6 +2013,424 @@ async def delete_pre_study_question(
         )
     
     await db.delete(pre_study_question)
+    await db.commit()
+    
+    return None
+
+
+# PostStudyQuestion Endpoints
+
+@app.post("/studies/{study_id}/post-study-questions", response_model=PostStudyQuestionResponse, status_code=status.HTTP_201_CREATED)
+async def create_post_study_question(
+    study_id: int,
+    question_data: PostStudyQuestionCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Create a post-study question for a study.
+    Requires authentication and user must be the study creator.
+    """
+    # Verify study exists and user is creator
+    study_result = await db.execute(
+        select(Study).where(Study.id == study_id)
+    )
+    study = study_result.scalar_one_or_none()
+    
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    if study.created_by_user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to modify this study"
+        )
+    
+    # Create or link question
+    if question_data.question_id:
+        # Link to existing question
+        question_result = await db.execute(
+            select(Question).where(Question.id == question_data.question_id)
+        )
+        question = question_result.scalar_one_or_none()
+        if question is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Question with id {question_data.question_id} not found"
+            )
+    else:
+        # Create new question
+        if not question_data.question_text or not question_data.question_text.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="question_text is required when question_id is not provided"
+            )
+        
+        question = Question(
+            question_text=question_data.question_text,
+            allows_free_text=question_data.allows_free_text,
+            allows_tags=question_data.allows_tags,
+            allows_multiple_tags=question_data.allows_multiple_tags if hasattr(question_data, 'allows_multiple_tags') else True
+        )
+        db.add(question)
+        await db.flush()  # Get the question ID
+    
+    # Check if question is already assigned to this study
+    existing_result = await db.execute(
+        select(PostStudyQuestion).where(
+            PostStudyQuestion.question_id == question.id,
+            PostStudyQuestion.study_id == study_id
+        )
+    )
+    if existing_result.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This question is already assigned to this study"
+        )
+    
+    # Determine order
+    order_result = await db.execute(
+        select(PostStudyQuestion).where(PostStudyQuestion.study_id == study_id)
+    )
+    existing_questions = order_result.scalars().all()
+    order = question_data.order if question_data.order is not None else len(existing_questions)
+    
+    # Create PostStudyQuestion
+    post_study_question = PostStudyQuestion(
+        question_id=question.id,
+        study_id=study_id,
+        order=order
+    )
+    db.add(post_study_question)
+    await db.flush()
+    
+    # Assign tags if provided
+    if question_data.tag_ids:
+        for tag_id in question_data.tag_ids:
+            tag_result = await db.execute(
+                select(QuestionTag).where(QuestionTag.id == tag_id)
+            )
+            tag = tag_result.scalar_one_or_none()
+            if tag is None:
+                continue
+            
+            assignment = QuestionTagAssignment(
+                question_id=question.id,
+                tag_id=tag_id,
+                order=len(question_data.tag_ids)  # Simple order
+            )
+            db.add(assignment)
+    
+    await db.commit()
+    await db.refresh(post_study_question)
+    
+    # Load question and tags
+    await db.refresh(question)
+    await db.refresh(post_study_question)
+    
+    # Get tags
+    tag_assignments_result = await db.execute(
+        select(QuestionTagAssignment).where(QuestionTagAssignment.question_id == question.id)
+        .options(selectinload(QuestionTagAssignment.tag))
+    )
+    tag_assignments = tag_assignments_result.scalars().all()
+    tags = [assignment.tag for assignment in tag_assignments]
+    
+    return PostStudyQuestionResponse(
+        id=post_study_question.id,
+        question_id=post_study_question.question_id,
+        study_id=post_study_question.study_id,
+        order=post_study_question.order,
+        created_at=post_study_question.created_at,
+        updated_at=post_study_question.updated_at,
+        question=QuestionResponseSchema(
+            id=question.id,
+            question_text=question.question_text,
+            allows_free_text=question.allows_free_text,
+            allows_tags=question.allows_tags,
+            allows_multiple_tags=question.allows_multiple_tags,
+            created_at=question.created_at,
+            updated_at=question.updated_at
+        ),
+        tags=[QuestionTagResponse(
+            id=tag.id,
+            tag_text=tag.tag_text,
+            is_default=tag.is_default,
+            created_by_user_id=tag.created_by_user_id,
+            created_at=tag.created_at
+        ) for tag in tags]
+    )
+
+
+@app.get("/studies/{study_id}/post-study-questions", response_model=List[PostStudyQuestionResponse])
+async def get_post_study_questions(
+    study_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all post-study questions for a study.
+    """
+    # Verify study exists
+    study_result = await db.execute(
+        select(Study).where(Study.id == study_id)
+    )
+    if study_result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    result = await db.execute(
+        select(PostStudyQuestion)
+        .where(PostStudyQuestion.study_id == study_id)
+        .options(
+            selectinload(PostStudyQuestion.question),
+            selectinload(PostStudyQuestion.question).selectinload(Question.tag_assignments).selectinload(QuestionTagAssignment.tag)
+        )
+        .order_by(PostStudyQuestion.order)
+    )
+    post_questions = result.scalars().all()
+    
+    # Build responses
+    responses = []
+    for post_q in post_questions:
+        tags = [assignment.tag for assignment in post_q.question.tag_assignments]
+        responses.append(PostStudyQuestionResponse(
+            id=post_q.id,
+            question_id=post_q.question_id,
+            study_id=post_q.study_id,
+            order=post_q.order,
+            created_at=post_q.created_at,
+            updated_at=post_q.updated_at,
+            question=QuestionResponseSchema(
+                id=post_q.question.id,
+                question_text=post_q.question.question_text,
+                allows_free_text=post_q.question.allows_free_text,
+                allows_tags=post_q.question.allows_tags,
+                allows_multiple_tags=post_q.question.allows_multiple_tags,
+                created_at=post_q.question.created_at,
+                updated_at=post_q.question.updated_at
+            ),
+            tags=[QuestionTagResponse(
+                id=tag.id,
+                tag_text=tag.tag_text,
+                is_default=tag.is_default,
+                created_by_user_id=tag.created_by_user_id,
+                created_at=tag.created_at
+            ) for tag in tags]
+        ))
+    
+    return responses
+
+
+@app.put("/studies/{study_id}/post-study-questions/{post_study_question_id}", response_model=PostStudyQuestionResponse)
+async def update_post_study_question(
+    study_id: int,
+    post_study_question_id: int,
+    question_data: PostStudyQuestionCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Update a post-study question.
+    Requires authentication and user must be the study creator.
+    """
+    # Verify study exists and user is creator
+    study_result = await db.execute(
+        select(Study).where(Study.id == study_id)
+    )
+    study = study_result.scalar_one_or_none()
+    
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    if study.created_by_user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to modify this study"
+        )
+    
+    # Get the post-study question
+    post_q_result = await db.execute(
+        select(PostStudyQuestion).where(
+            PostStudyQuestion.id == post_study_question_id,
+            PostStudyQuestion.study_id == study_id
+        )
+    )
+    post_study_question = post_q_result.scalar_one_or_none()
+    
+    if post_study_question is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Post-study question with id {post_study_question_id} not found"
+        )
+    
+    # Get the question
+    question_result = await db.execute(
+        select(Question).where(Question.id == post_study_question.question_id)
+    )
+    question = question_result.scalar_one_or_none()
+    
+    if question is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Associated question not found"
+        )
+    
+    # Update question if question_text is provided
+    if question_data.question_text and question_data.question_text.strip():
+        question.question_text = question_data.question_text
+    
+    if hasattr(question_data, 'allows_free_text'):
+        question.allows_free_text = question_data.allows_free_text
+    
+    if hasattr(question_data, 'allows_tags'):
+        question.allows_tags = question_data.allows_tags
+    
+    if hasattr(question_data, 'allows_multiple_tags'):
+        question.allows_multiple_tags = question_data.allows_multiple_tags
+    
+    # Update order if provided
+    if question_data.order is not None:
+        post_study_question.order = question_data.order
+    
+    # Update tags
+    if question_data.tag_ids is not None:
+        # Get current tag assignments
+        current_assignments_result = await db.execute(
+            select(QuestionTagAssignment).where(QuestionTagAssignment.question_id == question.id)
+        )
+        current_tag_assignments = current_assignments_result.scalars().all()
+        current_tag_ids = {assignment.tag_id for assignment in current_tag_assignments}
+        new_tag_ids = set(question_data.tag_ids)
+        
+        # Find tags to add and remove
+        tags_to_add = new_tag_ids - current_tag_ids
+        tags_to_remove = current_tag_ids - new_tag_ids
+        
+        # Remove tags
+        for assignment in current_tag_assignments:
+            if assignment.tag_id in tags_to_remove:
+                await db.delete(assignment)
+        
+        # Add new tags
+        for tag_id in tags_to_add:
+            tag_result = await db.execute(
+                select(QuestionTag).where(QuestionTag.id == tag_id)
+            )
+            tag = tag_result.scalar_one_or_none()
+            if tag is None:
+                continue
+            
+            # Check if assignment already exists
+            existing_assignment_result = await db.execute(
+                select(QuestionTagAssignment).where(
+                    QuestionTagAssignment.question_id == question.id,
+                    QuestionTagAssignment.tag_id == tag_id
+                )
+            )
+            if existing_assignment_result.scalar_one_or_none() is None:
+                assignment = QuestionTagAssignment(
+                    question_id=question.id,
+                    tag_id=tag_id,
+                    order=len(new_tag_ids)  # Simple order
+                )
+                db.add(assignment)
+        
+        # Update order for existing tags
+        for assignment in current_tag_assignments:
+            if assignment.tag_id in new_tag_ids:
+                assignment.order = list(new_tag_ids).index(assignment.tag_id)
+    
+    await db.commit()
+    await db.refresh(post_study_question)
+    await db.refresh(question)
+    
+    # Get tags
+    tag_assignments_result = await db.execute(
+        select(QuestionTagAssignment).where(QuestionTagAssignment.question_id == question.id)
+        .options(selectinload(QuestionTagAssignment.tag))
+    )
+    tag_assignments = tag_assignments_result.scalars().all()
+    tags = [assignment.tag for assignment in tag_assignments]
+    
+    return PostStudyQuestionResponse(
+        id=post_study_question.id,
+        question_id=post_study_question.question_id,
+        study_id=post_study_question.study_id,
+        order=post_study_question.order,
+        created_at=post_study_question.created_at,
+        updated_at=post_study_question.updated_at,
+        question=QuestionResponseSchema(
+            id=question.id,
+            question_text=question.question_text,
+            allows_free_text=question.allows_free_text,
+            allows_tags=question.allows_tags,
+            allows_multiple_tags=question.allows_multiple_tags,
+            created_at=question.created_at,
+            updated_at=question.updated_at
+        ),
+        tags=[QuestionTagResponse(
+            id=tag.id,
+            tag_text=tag.tag_text,
+            is_default=tag.is_default,
+            created_by_user_id=tag.created_by_user_id,
+            created_at=tag.created_at
+        ) for tag in tags]
+    )
+
+
+@app.delete("/studies/{study_id}/post-study-questions/{post_study_question_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_post_study_question(
+    study_id: int,
+    post_study_question_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Delete a post-study question.
+    Requires authentication and user must be the study creator.
+    """
+    # Verify study exists and user is creator
+    study_result = await db.execute(
+        select(Study).where(Study.id == study_id)
+    )
+    study = study_result.scalar_one_or_none()
+    
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    if study.created_by_user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to modify this study"
+        )
+    
+    # Get the post-study question
+    post_q_result = await db.execute(
+        select(PostStudyQuestion).where(
+            PostStudyQuestion.id == post_study_question_id,
+            PostStudyQuestion.study_id == study_id
+        )
+    )
+    post_study_question = post_q_result.scalar_one_or_none()
+    
+    if post_study_question is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Post-study question with id {post_study_question_id} not found"
+        )
+    
+    await db.delete(post_study_question)
     await db.commit()
     
     return None

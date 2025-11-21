@@ -641,6 +641,79 @@ export const preStudyQuestionApi = {
   },
 };
 
+// PostStudyQuestion API
+export interface PostStudyQuestionCreate {
+  question_id?: number;
+  question_text?: string;
+  allows_free_text?: boolean;
+  allows_tags?: boolean;
+  allows_multiple_tags?: boolean;
+  order?: number;
+  tag_ids?: number[];
+}
+
+export interface PostStudyQuestionResponse {
+  id: number;
+  question_id: number;
+  study_id: number;
+  order: number;
+  created_at: string;
+  updated_at?: string;
+  question: QuestionResponse;
+  tags: QuestionTagResponse[];
+}
+
+export const postStudyQuestionApi = {
+  async create(studyId: number, question: PostStudyQuestionCreate): Promise<PostStudyQuestionResponse> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${studyId}/post-study-questions`, {
+      method: 'POST',
+      body: JSON.stringify(question),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to create post-study question' }));
+      throw new Error(error.detail || 'Failed to create post-study question');
+    }
+
+    return response.json();
+  },
+
+  async getAll(studyId: number): Promise<PostStudyQuestionResponse[]> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${studyId}/post-study-questions`);
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch post-study questions');
+    }
+
+    return response.json();
+  },
+
+  async update(studyId: number, questionId: number, question: PostStudyQuestionCreate): Promise<PostStudyQuestionResponse> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${studyId}/post-study-questions/${questionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(question),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to update post-study question' }));
+      throw new Error(error.detail || 'Failed to update post-study question');
+    }
+
+    return response.json();
+  },
+
+  async delete(studyId: number, questionId: number): Promise<void> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${studyId}/post-study-questions/${questionId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to delete post-study question' }));
+      throw new Error(error.detail || 'Failed to delete post-study question');
+    }
+  },
+};
+
 // Question API
 export interface QuestionTagResponse {
   id: number;

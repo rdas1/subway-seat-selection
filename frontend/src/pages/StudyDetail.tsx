@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { studyApi, StudyResponse, trainConfigApi, scenarioGroupApi, PostResponseQuestionResponse, PostResponseQuestionCreate, questionApi, TagLibraryResponse, QuestionResponseResponse, TrainConfigurationResponse, preStudyQuestionApi, PreStudyQuestionResponse, PreStudyQuestionCreate, QuestionTagResponse } from '../services/api'
+import { studyApi, StudyResponse, trainConfigApi, scenarioGroupApi, PostResponseQuestionResponse, PostResponseQuestionCreate, questionApi, TagLibraryResponse, QuestionResponseResponse, TrainConfigurationResponse, preStudyQuestionApi, PreStudyQuestionResponse, PreStudyQuestionCreate, postStudyQuestionApi, PostStudyQuestionResponse, PostStudyQuestionCreate, QuestionTagResponse } from '../services/api'
 import { Tile } from '../types/grid'
 import { useAuth } from '../contexts/AuthContext'
 import { formatRelativeTime } from '../utils/time'
@@ -76,6 +76,12 @@ export default function StudyDetail() {
   const [editingPreStudyQuestion, setEditingPreStudyQuestion] = useState<PreStudyQuestionResponse | null>(null)
   const [preStudyQuestionsExpanded, setPreStudyQuestionsExpanded] = useState<boolean>(true)
   const [showQuestionTemplates, setShowQuestionTemplates] = useState<boolean>(false)
+  const [postStudyQuestions, setPostStudyQuestions] = useState<PostStudyQuestionResponse[]>([])
+  const [loadingPostStudyQuestions, setLoadingPostStudyQuestions] = useState<boolean>(false)
+  const [editingPostStudyQuestion, setEditingPostStudyQuestion] = useState<PostStudyQuestionResponse | null>(null)
+  const [postStudyQuestionsExpanded, setPostStudyQuestionsExpanded] = useState<boolean>(true)
+  const [showPostStudyQuestionTemplates, setShowPostStudyQuestionTemplates] = useState<boolean>(false)
+  const [scenariosExpanded, setScenariosExpanded] = useState<boolean>(true)
   const titleDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const descriptionDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -307,6 +313,59 @@ export default function StudyDetail() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete pre-study question')
+    }
+  }
+
+  // Post-Study Questions handlers
+  const handleCreatePostStudyQuestion = async (questionData: PostStudyQuestionCreate) => {
+    if (!study?.id) return
+    
+    try {
+      const created = await postStudyQuestionApi.create(study.id, {
+        ...questionData,
+        order: postStudyQuestions.length,
+      })
+      setPostStudyQuestions([...postStudyQuestions, created])
+      setEditingPostStudyQuestion(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create post-study question')
+    }
+  }
+
+  const handleUpdatePostStudyQuestion = async (questionId: number, updates: Partial<PostStudyQuestionCreate>) => {
+    if (!study?.id) return
+    
+    const question = postStudyQuestions.find(q => q.id === questionId)
+    if (!question) return
+    
+    const updateData: PostStudyQuestionCreate = {
+      question_text: updates.question_text ?? question.question.question_text,
+      allows_free_text: updates.allows_free_text ?? question.question.allows_free_text,
+      allows_tags: updates.allows_tags ?? question.question.allows_tags,
+      allows_multiple_tags: updates.allows_multiple_tags ?? question.question.allows_multiple_tags,
+      tag_ids: updates.tag_ids ?? question.tags.map(t => t.id)
+    }
+    
+    try {
+      const updated = await postStudyQuestionApi.update(study.id, questionId, updateData)
+      setPostStudyQuestions(postStudyQuestions.map(q => q.id === questionId ? updated : q))
+      setEditingPostStudyQuestion(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update post-study question')
+    }
+  }
+
+  const handleDeletePostStudyQuestion = async (questionId: number) => {
+    if (!study?.id) return
+    
+    try {
+      await postStudyQuestionApi.delete(study.id, questionId)
+      setPostStudyQuestions(postStudyQuestions.filter(q => q.id !== questionId))
+      if (editingPostStudyQuestion?.id === questionId) {
+        setEditingPostStudyQuestion(null)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete post-study question')
     }
   }
 
@@ -560,6 +619,27 @@ export default function StudyDetail() {
     }
   }, [study?.id])
 
+  // Load post-study questions
+  useEffect(() => {
+    if (study?.id) {
+      const loadPostStudyQuestions = async () => {
+        setLoadingPostStudyQuestions(true)
+        try {
+          const questions = await postStudyQuestionApi.getAll(study.id)
+          setPostStudyQuestions(questions)
+        } catch (err) {
+          console.error('Failed to load post-study questions:', err)
+          setError(err instanceof Error ? err.message : 'Failed to load post-study questions')
+        } finally {
+          setLoadingPostStudyQuestions(false)
+        }
+      }
+      loadPostStudyQuestions()
+    } else {
+      setPostStudyQuestions([])
+    }
+  }, [study?.id])
+
   // Load response counts for all scenarios in the study
   useEffect(() => {
     if (study?.scenario_group?.items) {
@@ -678,7 +758,7 @@ export default function StudyDetail() {
         {study && (
           <div className="pre-study-questions-section">
             <div className="section-header" onClick={() => setPreStudyQuestionsExpanded(!preStudyQuestionsExpanded)}>
-              <h2 className="section-title">Pre-Study Questions</h2>
+              <h2 className="section-title">Pre-Study Questions ({preStudyQuestions.length})</h2>
               <button className="section-toggle" aria-label={preStudyQuestionsExpanded ? 'Collapse' : 'Expand'}>
                 {preStudyQuestionsExpanded ? '−' : '+'}
               </button>
@@ -748,16 +828,13 @@ export default function StudyDetail() {
                         studyId={study.id}
                         questionOrder={preStudyQuestions.length}
                         tagLibrary={tagLibrary}
-                        showTagLibrary={showTagLibrary}
-                        onCloseTagLibrary={() => setShowTagLibrary(false)}
                         onCreateTag={handleCreateNewTag}
-                        onSelectTags={async (tagIds: number[]) => {
+                        onSelectTags={async () => {
                           // For Custom tab, tag selection is handled by PreStudyQuestionEditor's internal state
                         }}
                         onAddTags={async () => {
                           const library = await questionApi.getTagLibrary()
                           setTagLibrary(library)
-                          setShowTagLibrary(true)
                         }}
                         onSelectTemplate={async (template: QuestionTemplate) => {
                           // Create tags for the template
@@ -839,11 +916,8 @@ export default function StudyDetail() {
                         onAddTags={async () => {
                           const library = await questionApi.getTagLibrary()
                           setTagLibrary(library)
-                          setShowTagLibrary(true)
                         }}
                         tagLibrary={tagLibrary}
-                        showTagLibrary={showTagLibrary}
-                        onCloseTagLibrary={() => setShowTagLibrary(false)}
                         onCreateTag={handleCreateNewTag}
                         onSelectTags={async (tagIds: number[]) => {
                           if (editingPreStudyQuestion) {
@@ -906,13 +980,20 @@ export default function StudyDetail() {
         {/* Scenarios Section */}
         {study.scenario_group && (
           <div className="scenarios-section">
-            <h2 className="scenarios-section-title">Scenarios</h2>
-            {error && (
-              <div className="error-message" style={{ marginBottom: '1rem' }}>
-                <p>{error}</p>
-              </div>
-            )}
-            <div className="scenarios-grid">
+            <div className="section-header" onClick={() => setScenariosExpanded(!scenariosExpanded)}>
+              <h2 className="section-title">Scenarios ({study.scenario_group?.items?.length || 0})</h2>
+              <button className="section-toggle" aria-label={scenariosExpanded ? 'Collapse' : 'Expand'}>
+                {scenariosExpanded ? '−' : '+'}
+              </button>
+            </div>
+            {scenariosExpanded && (
+              <>
+                {error && (
+                  <div className="error-message" style={{ marginBottom: '1rem' }}>
+                    <p>{error}</p>
+                  </div>
+                )}
+                <div className="scenarios-grid">
               {/* Create new scenario card (first position) */}
               <div 
                 className="scenario-card scenario-card-create"
@@ -1050,7 +1131,218 @@ export default function StudyDetail() {
                   </div>
                 )
               })}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Post-Study Questions Section */}
+        {study && (
+          <div className="pre-study-questions-section">
+            <div className="section-header" onClick={() => setPostStudyQuestionsExpanded(!postStudyQuestionsExpanded)}>
+              <h2 className="section-title">Post-Study Questions ({postStudyQuestions.length})</h2>
+              <button className="section-toggle" aria-label={postStudyQuestionsExpanded ? 'Collapse' : 'Expand'}>
+                {postStudyQuestionsExpanded ? '−' : '+'}
+              </button>
             </div>
+            {postStudyQuestionsExpanded && (
+              <>
+                {error && (
+                  <div className="error-message" style={{ marginBottom: '1rem' }}>
+                    <p>{error}</p>
+                  </div>
+                )}
+                <div className="pre-study-questions-grid">
+                  {/* Create new question card */}
+                  <div 
+                    className="pre-study-question-card pre-study-question-card-create"
+                    onClick={() => setShowPostStudyQuestionTemplates(true)}
+                  >
+                    <div className="pre-study-question-card-content">
+                      <div className="pre-study-question-card-plus">+</div>
+                      <h3>Create New Question</h3>
+                    </div>
+                  </div>
+                  {/* Existing questions */}
+                  {loadingPostStudyQuestions ? (
+                    <div className="loading-message">Loading questions...</div>
+                  ) : (
+                    postStudyQuestions.map((question) => (
+                      <div key={question.id} className="pre-study-question-card">
+                        <button
+                          className="pre-study-question-card-delete"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (confirm(`Are you sure you want to delete this question?`)) {
+                              handleDeletePostStudyQuestion(question.id)
+                            }
+                          }}
+                          aria-label="Delete question"
+                        >
+                          ×
+                        </button>
+                        <div 
+                          className="pre-study-question-card-content"
+                          onClick={() => setEditingPostStudyQuestion(question)}
+                        >
+                          <h3>{question.question.question_text}</h3>
+                          {question.tags.length > 0 && (
+                            <div className="pre-study-question-tags">
+                              {question.tags.map(tag => (
+                                <span key={tag.id} className="tag-badge">{tag.tag_text}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                {/* Question Templates Modal */}
+                {showPostStudyQuestionTemplates && (
+                  <div className="question-editor-modal-overlay" onClick={() => setShowPostStudyQuestionTemplates(false)}>
+                    <div className="question-editor-modal" onClick={(e) => e.stopPropagation()}>
+                      <div className="question-editor-header">
+                        <h3>Create New Question</h3>
+                        <button onClick={() => setShowPostStudyQuestionTemplates(false)} className="close-button">×</button>
+                      </div>
+                      <QuestionTemplateSelector
+                        studyId={study.id}
+                        questionOrder={postStudyQuestions.length}
+                        tagLibrary={tagLibrary}
+                        onCreateTag={handleCreateNewTag}
+                        onSelectTags={async () => {
+                          // For Custom tab, tag selection is handled by PreStudyQuestionEditor's internal state
+                        }}
+                        onAddTags={async () => {
+                          const library = await questionApi.getTagLibrary()
+                          setTagLibrary(library)
+                        }}
+                        onSelectTemplate={async (template: QuestionTemplate) => {
+                          // Create tags for the template
+                          const tagObjects: QuestionTagResponse[] = []
+                          if (template.tags && template.tags.length > 0) {
+                            try {
+                              const library = await questionApi.getTagLibrary()
+                              const allTags = [...library.default_tags, ...library.your_tags, ...library.community_tags]
+                              
+                              // Find or create tags
+                              for (const tagText of template.tags) {
+                                let tag = allTags.find(t => t.tag_text.toLowerCase() === tagText.toLowerCase())
+                                if (!tag) {
+                                  // Create the tag
+                                  tag = await questionApi.createTag({ tag_text: tagText })
+                                }
+                                tagObjects.push(tag)
+                              }
+                            } catch (err) {
+                              console.error('Failed to create/find tags:', err)
+                            }
+                          }
+                          
+                          const newQuestion: PostStudyQuestionResponse = {
+                            id: -1,
+                            question_id: -1,
+                            study_id: study.id,
+                            order: postStudyQuestions.length,
+                            created_at: new Date().toISOString(),
+                            question: {
+                              id: -1,
+                              question_text: template.question_text,
+                              allows_free_text: template.allows_free_text ?? false,
+                              allows_tags: template.allows_tags ?? true,
+                              allows_multiple_tags: template.allows_multiple_tags ?? false,
+                              created_at: new Date().toISOString()
+                            },
+                            tags: tagObjects
+                          }
+                          setEditingPostStudyQuestion(newQuestion)
+                          setShowPostStudyQuestionTemplates(false)
+                        }}
+                        onCancel={() => setShowPostStudyQuestionTemplates(false)}
+                        onCreateBlank={(updates?: PostStudyQuestionCreate) => {
+                          if (updates) {
+                            // User clicked "Create" in the Custom tab, create the question
+                            handleCreatePostStudyQuestion(updates)
+                            setShowPostStudyQuestionTemplates(false)
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+                {/* Question Editor Modal */}
+                {editingPostStudyQuestion && (
+                  <div className="question-editor-modal-overlay" onClick={() => setEditingPostStudyQuestion(null)}>
+                    <div className="question-editor-modal" onClick={(e) => e.stopPropagation()}>
+                      <div className="question-editor-header">
+                        <h3>{editingPostStudyQuestion.id === -1 ? 'Create Question' : 'Edit Question'}</h3>
+                      </div>
+                      <PreStudyQuestionEditor
+                        question={editingPostStudyQuestion as any}
+                        onSave={editingPostStudyQuestion.id === -1 ? handleCreatePostStudyQuestion : (updates) => handleUpdatePostStudyQuestion(editingPostStudyQuestion.id, updates)}
+                        onCancel={() => setEditingPostStudyQuestion(null)}
+                        onAddTags={async () => {
+                          const library = await questionApi.getTagLibrary()
+                          setTagLibrary(library)
+                          setShowTagLibrary(true)
+                        }}
+                        tagLibrary={tagLibrary}
+                        onCreateTag={handleCreateNewTag}
+                        onSelectTags={async (tagIds: number[]) => {
+                          if (editingPostStudyQuestion) {
+                            if (editingPostStudyQuestion.id === -1) {
+                              // For new questions, update local state
+                              // If tagIds is a subset (removal), filter; otherwise merge
+                              const currentTagIds = editingPostStudyQuestion.tags.map(t => t.id)
+                              const isRemoval = tagIds.length < currentTagIds.length
+                              let newTags
+                              if (isRemoval) {
+                                // Tag removal - use the provided tagIds directly
+                                // We need to get the tag objects from tagLibrary
+                                if (tagLibrary) {
+                                  const allTags = [...tagLibrary.default_tags, ...tagLibrary.your_tags, ...tagLibrary.community_tags]
+                                  newTags = tagIds.map(id => {
+                                    const tag = allTags.find(t => t.id === id)
+                                    return tag || { id, tag_text: '', is_default: false, created_at: new Date().toISOString() }
+                                  })
+                                } else {
+                                  newTags = editingPostStudyQuestion.tags.filter(t => tagIds.includes(t.id))
+                                }
+                              } else {
+                                // Tag addition - merge
+                                const newTagIds = [...new Set([...currentTagIds, ...tagIds])]
+                                if (tagLibrary) {
+                                  const allTags = [...tagLibrary.default_tags, ...tagLibrary.your_tags, ...tagLibrary.community_tags]
+                                  newTags = newTagIds.map(id => {
+                                    const tag = allTags.find(t => t.id === id)
+                                    return tag || { id, tag_text: '', is_default: false, created_at: new Date().toISOString() }
+                                  })
+                                } else {
+                                  newTags = editingPostStudyQuestion.tags
+                                }
+                              }
+                              setEditingPostStudyQuestion({
+                                ...editingPostStudyQuestion,
+                                tags: newTags
+                              })
+                            } else {
+                              // For existing questions, update via API
+                              const currentTagIds = editingPostStudyQuestion.tags.map(t => t.id)
+                              const isRemoval = tagIds.length < currentTagIds.length
+                              const newTagIds = isRemoval ? tagIds : [...new Set([...currentTagIds, ...tagIds])]
+                              await handleUpdatePostStudyQuestion(editingPostStudyQuestion.id, { tag_ids: newTagIds })
+                            }
+                            setShowTagLibrary(false)
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
@@ -1353,8 +1645,6 @@ function QuestionTemplateSelector({
   studyId,
   questionOrder,
   tagLibrary,
-  showTagLibrary,
-  onCloseTagLibrary,
   onCreateTag,
   onSelectTags,
   onAddTags
@@ -1365,8 +1655,6 @@ function QuestionTemplateSelector({
   studyId: number;
   questionOrder: number;
   tagLibrary?: TagLibraryResponse | null;
-  showTagLibrary?: boolean;
-  onCloseTagLibrary?: () => void;
   onCreateTag?: (tagText: string) => Promise<any>;
   onSelectTags?: (tagIds: number[]) => void;
   onAddTags?: () => void;
@@ -1481,8 +1769,6 @@ function QuestionTemplateSelector({
             onCancel={onCancel}
             onAddTags={onAddTags || (async () => {})}
             tagLibrary={tagLibrary}
-            showTagLibrary={showTagLibrary}
-            onCloseTagLibrary={onCloseTagLibrary}
             onCreateTag={onCreateTag}
             onSelectTags={onSelectTags}
           />
@@ -1499,8 +1785,6 @@ function PreStudyQuestionEditor({
   onCancel,
   onAddTags,
   tagLibrary,
-  showTagLibrary,
-  onCloseTagLibrary,
   onCreateTag,
   onSelectTags
 }: {
@@ -1509,8 +1793,6 @@ function PreStudyQuestionEditor({
   onCancel: () => void;
   onAddTags: () => void;
   tagLibrary?: TagLibraryResponse | null;
-  showTagLibrary?: boolean;
-  onCloseTagLibrary?: () => void;
   onCreateTag?: (tagText: string) => Promise<any>;
   onSelectTags?: (tagIds: number[]) => void;
 }) {
@@ -1519,8 +1801,44 @@ function PreStudyQuestionEditor({
   const [allowsTags, setAllowsTags] = useState(question.question.allows_tags)
   const [allowsMultipleTags, setAllowsMultipleTags] = useState(question.question.allows_multiple_tags ?? true)
   const [currentTags, setCurrentTags] = useState<QuestionTagResponse[]>(question.tags || [])
+  const [tagInputValue, setTagInputValue] = useState('')
+  const [showTagDropdown, setShowTagDropdown] = useState(false)
+  const [availableTags, setAvailableTags] = useState<QuestionTagResponse[]>([])
+  const [filteredTags, setFilteredTags] = useState<QuestionTagResponse[]>([])
+  const tagInputRef = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   
   const isNewQuestion = question.id === -1
+  
+  // Load tag library when component mounts or when tags are enabled
+  useEffect(() => {
+    if (allowsTags && onAddTags) {
+      onAddTags()
+    }
+  }, [allowsTags])
+  
+  // Update available tags when tagLibrary changes
+  useEffect(() => {
+    if (tagLibrary) {
+      const allTags = [...tagLibrary.default_tags, ...tagLibrary.your_tags, ...tagLibrary.community_tags]
+      setAvailableTags(allTags)
+    }
+  }, [tagLibrary])
+  
+  // Filter tags based on input
+  useEffect(() => {
+    if (!tagInputValue.trim()) {
+      setFilteredTags(availableTags.filter(tag => !currentTags.some(ct => ct.id === tag.id)))
+    } else {
+      const searchTerm = tagInputValue.toLowerCase()
+      setFilteredTags(
+        availableTags.filter(tag => 
+          !currentTags.some(ct => ct.id === tag.id) &&
+          tag.tag_text.toLowerCase().includes(searchTerm)
+        )
+      )
+    }
+  }, [tagInputValue, availableTags, currentTags])
   
   // Update currentTags when question.tags changes (for existing questions)
   useEffect(() => {
@@ -1528,6 +1846,25 @@ function PreStudyQuestionEditor({
       setCurrentTags(question.tags || [])
     }
   }, [question.tags, isNewQuestion])
+  
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        tagInputRef.current &&
+        !tagInputRef.current.contains(event.target as Node)
+      ) {
+        setShowTagDropdown(false)
+      }
+    }
+    
+    if (showTagDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showTagDropdown])
   
   const handleSave = () => {
     const updates: PreStudyQuestionCreate = {
@@ -1551,6 +1888,56 @@ function PreStudyQuestionEditor({
     }
     if (onSelectTags) {
       await onSelectTags(tagIds)
+    }
+  }
+  
+  const handleTagInputFocus = () => {
+    setShowTagDropdown(true)
+  }
+  
+  const handleTagInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTagInputValue(e.target.value)
+    setShowTagDropdown(true)
+  }
+  
+  const handleSelectTag = async (tag: QuestionTagResponse) => {
+    const newTagIds = [...currentTags.map(t => t.id), tag.id]
+    await handleTagSelection(newTagIds)
+    setTagInputValue('')
+    setShowTagDropdown(false)
+    tagInputRef.current?.blur()
+  }
+  
+  const handleCreateNewTag = async () => {
+    if (!tagInputValue.trim() || !onCreateTag) return
+    
+    const trimmedValue = tagInputValue.trim()
+    // Check if tag already exists
+    const existingTag = availableTags.find(t => t.tag_text.toLowerCase() === trimmedValue.toLowerCase())
+    if (existingTag) {
+      await handleSelectTag(existingTag)
+      return
+    }
+    
+    try {
+      const newTag = await onCreateTag(trimmedValue)
+      await handleSelectTag(newTag)
+    } catch (err) {
+      console.error('Failed to create tag:', err)
+    }
+  }
+  
+  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (filteredTags.length > 0) {
+        handleSelectTag(filteredTags[0])
+      } else if (tagInputValue.trim()) {
+        handleCreateNewTag()
+      }
+    } else if (e.key === 'Escape') {
+      setShowTagDropdown(false)
+      tagInputRef.current?.blur()
     }
   }
   
@@ -1604,9 +1991,9 @@ function PreStudyQuestionEditor({
       )}
       {allowsTags && (
         <div className="form-group">
+          <label>Tags</label>
           {currentTags.length > 0 && (
             <div className="question-tags">
-              <label>Tags</label>
               <div className="tags-list">
                 {currentTags.map((tag) => (
                   <span key={tag.id} className="tag-badge">
@@ -1630,9 +2017,50 @@ function PreStudyQuestionEditor({
               </div>
             </div>
           )}
-          <button onClick={onAddTags} className="add-tags-button">
-            {currentTags.length > 0 ? 'Add More Tags' : 'Add Tags'}
-          </button>
+          <div className="tag-input-wrapper" style={{ position: 'relative' }}>
+            <input
+              ref={tagInputRef}
+              type="text"
+              value={tagInputValue}
+              onChange={handleTagInputChange}
+              onFocus={handleTagInputFocus}
+              onKeyDown={handleTagInputKeyDown}
+              placeholder="Type to search or create tags..."
+              className="tag-input"
+            />
+            {showTagDropdown && (
+              <div ref={dropdownRef} className="tag-dropdown">
+                {filteredTags.length > 0 ? (
+                  <>
+                    {filteredTags.slice(0, 10).map((tag) => (
+                      <div
+                        key={tag.id}
+                        className="tag-dropdown-item"
+                        onClick={() => handleSelectTag(tag)}
+                      >
+                        {tag.tag_text}
+                        {tag.is_default && <span className="tag-dropdown-badge">Default</span>}
+                      </div>
+                    ))}
+                    {filteredTags.length > 10 && (
+                      <div className="tag-dropdown-more">
+                        +{filteredTags.length - 10} more
+                      </div>
+                    )}
+                  </>
+                ) : tagInputValue.trim() ? (
+                  <div
+                    className="tag-dropdown-item tag-dropdown-create"
+                    onClick={handleCreateNewTag}
+                  >
+                    Create "{tagInputValue.trim()}"
+                  </div>
+                ) : (
+                  <div className="tag-dropdown-empty">No tags available</div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
       <div className="question-editor-actions">
@@ -1645,23 +2073,6 @@ function PreStudyQuestionEditor({
           {isNewQuestion ? 'Create' : 'Save'}
         </button>
       </div>
-      {showTagLibrary && tagLibrary && onSelectTags && onCreateTag && onCloseTagLibrary && (
-        <div className="tag-library-modal-overlay" onClick={onCloseTagLibrary}>
-          <div className="tag-library-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="tag-library-header">
-              <h3>Select Tags</h3>
-              <button onClick={onCloseTagLibrary} className="close-button">×</button>
-            </div>
-            <StudyTagLibraryModal
-              library={tagLibrary}
-              currentTagIds={currentTags.map(t => t.id)}
-              onSelectTags={handleTagSelection}
-              onCreateTag={onCreateTag}
-              onClose={onCloseTagLibrary}
-            />
-          </div>
-        </div>
-      )}
     </div>
   )
 }

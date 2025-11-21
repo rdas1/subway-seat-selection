@@ -96,15 +96,15 @@ export default function VerificationPage() {
         <h1>Login</h1>
         {!emailEntered ? (
           <form onSubmit={handleSendCode} className="verification-form">
-            <div className="form-group">
-              <label htmlFor="email">Email</label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email address"
-                required
+          <div className="form-group">
+            <label htmlFor="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email address"
+              required
                 disabled={sendingCode}
                 autoFocus
               />
@@ -150,31 +150,31 @@ export default function VerificationPage() {
                     Change
                   </button>
                 </div>
-              </div>
-              <div className="form-group">
-                <label htmlFor="code">Verification Code</label>
-                <input
-                  type="text"
-                  id="code"
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="Enter 6-digit code"
-                  maxLength={6}
-                  required
-                  disabled={loading}
-                  pattern="[0-9]{6}"
+          </div>
+          <div className="form-group">
+            <label htmlFor="code">Verification Code</label>
+            <input
+              type="text"
+              id="code"
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="Enter 6-digit code"
+              maxLength={6}
+              required
+              disabled={loading}
+              pattern="[0-9]{6}"
                   autoFocus
-                />
-              </div>
-            {error && (
-              <div className="error-message">
-                <p>{error}</p>
-              </div>
-            )}
-              <button type="submit" className="submit-button" disabled={loading}>
-                {loading ? 'Verifying...' : 'Verify'}
-              </button>
-            </form>
+            />
+          </div>
+          {error && (
+            <div className="error-message">
+              <p>{error}</p>
+            </div>
+          )}
+          <button type="submit" className="submit-button" disabled={loading}>
+            {loading ? 'Verifying...' : 'Verify'}
+          </button>
+        </form>
           </>
         )}
       </div>

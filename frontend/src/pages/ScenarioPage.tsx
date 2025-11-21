@@ -418,7 +418,7 @@ export default function ScenarioPage() {
             </>
           ) : grid ? (
             <>
-              {scenarioTitle && <h1 className="scenario-title">{scenarioTitle}</h1>}
+              <p className="scenario-title"><i>Scenario {id}{scenarioTitle ? `: "${scenarioTitle}"` : ''}</i></p>
               <h1 className="main-header-prompt">Your train is here! Where will you sit or stand?</h1>
             </>
           ) : loading || !grid ? (
