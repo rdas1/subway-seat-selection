@@ -41,6 +41,7 @@ export default function StudyResponsesPage() {
   
   // Scenario data
   const [scenarios, setScenarios] = useState<TrainConfigurationResponse[]>([])
+  const [scenarioOrders, setScenarioOrders] = useState<Record<number, number>>({}) // scenarioId -> order index
   const [scenarioStatistics, setScenarioStatistics] = useState<Record<number, any>>({})
   const [scenarioQuestionResponses, setScenarioQuestionResponses] = useState<Record<number, Record<number, QuestionResponseResponse[]>>>({})
   const [scenarioQuestions, setScenarioQuestions] = useState<Record<number, PostResponseQuestionResponse[]>>({})
@@ -87,14 +88,21 @@ export default function StudyResponsesPage() {
           // Load scenarios and their data
           if (studyData.scenario_group?.items) {
             const scenarioList: TrainConfigurationResponse[] = []
+            const ordersMap: Record<number, number> = {}
             const statsMap: Record<number, any> = {}
             const questionResponsesMap: Record<number, Record<number, QuestionResponseResponse[]>> = {}
             const questionsMap: Record<number, PostResponseQuestionResponse[]> = {}
             
-            for (const item of studyData.scenario_group.items) {
+            // Sort items by order to ensure correct indexing
+            const sortedItems = [...studyData.scenario_group.items].sort((a, b) => (a.order || 0) - (b.order || 0))
+            
+            for (let index = 0; index < sortedItems.length; index++) {
+              const item = sortedItems[index]
               if (item.train_configuration) {
                 const scenario = item.train_configuration
                 scenarioList.push(scenario)
+                // Store order index (1-indexed for display)
+                ordersMap[scenario.id] = index + 1
                 
                 // Load statistics, question responses, and questions for each scenario
                 try {
@@ -113,6 +121,7 @@ export default function StudyResponsesPage() {
             }
             
             setScenarios(scenarioList)
+            setScenarioOrders(ordersMap)
             setScenarioStatistics(statsMap)
             setScenarioQuestionResponses(questionResponsesMap)
             setScenarioQuestions(questionsMap)
@@ -397,19 +406,69 @@ export default function StudyResponsesPage() {
     )
   }
 
+  // Scroll to section handler
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
   return (
     <div className="study-responses-page">
-      <div className="study-responses-container">
-        <div className="study-responses-header">
-          <button onClick={() => navigate(`/study-builder/${study.id}`)} className="back-button">
-            ← Back to Study Detail
-          </button>
-          <h1>{study.title} - All Responses</h1>
-        </div>
+      <div className="study-responses-layout">
+        {/* Navigation Sidebar */}
+        <nav className="study-responses-nav">
+          <h3 className="nav-title">Navigation</h3>
+          <ul className="nav-list">
+            {preStudyQuestions.length > 0 && (
+              <li>
+                <button
+                  onClick={() => scrollToSection('pre-study-questions')}
+                  className="nav-link"
+                >
+                  Pre-Study Questions
+                </button>
+              </li>
+            )}
+            {scenarios.map((scenario) => {
+              const scenarioOrder = scenarioOrders[scenario.id] || 0
+              const scenarioName = scenario.title || scenario.name || 'Untitled Scenario'
+              return (
+                <li key={scenario.id}>
+                  <button
+                    onClick={() => scrollToSection(`scenario-${scenario.id}`)}
+                    className="nav-link"
+                  >
+                    {scenarioOrder > 0 ? `Scenario ${scenarioOrder}` : scenarioName}
+                  </button>
+                </li>
+              )
+            })}
+            {postStudyQuestions.length > 0 && (
+              <li>
+                <button
+                  onClick={() => scrollToSection('post-study-questions')}
+                  className="nav-link"
+                >
+                  Post-Study Questions
+                </button>
+              </li>
+            )}
+          </ul>
+        </nav>
 
-        {/* Pre-Study Question Responses */}
-        {preStudyQuestions.length > 0 && (
-          <section className="responses-section">
+        <div className="study-responses-container">
+          <div className="study-responses-header">
+            <button onClick={() => navigate(`/study-builder/${study.id}`)} className="back-button">
+              ← Back to Study Detail
+            </button>
+            <h1>{study.title} - All Responses</h1>
+          </div>
+
+          {/* Pre-Study Question Responses */}
+          {preStudyQuestions.length > 0 && (
+            <section id="pre-study-questions" className="responses-section">
             <h2>Pre-Study Question Responses</h2>
             <div className="question-responses-list">
               {preStudyQuestions.map((question) => {
@@ -515,10 +574,20 @@ export default function StudyResponsesPage() {
             {scenarios.map((scenario) => {
               const stats = scenarioStatistics[scenario.id]
               const questionResponses = scenarioQuestionResponses[scenario.id] || {}
+              const scenarioOrder = scenarioOrders[scenario.id] || 0
+              const responseCount = stats?.total_responses || 0
               
               return (
-                <div key={scenario.id} className="scenario-responses-group">
-                  <h3>{scenario.title || scenario.name || 'Untitled Scenario'}</h3>
+                <div key={scenario.id} id={`scenario-${scenario.id}`} className="scenario-responses-group">
+                  <div className="scenario-header">
+                    <h3>
+                      {scenarioOrder > 0 && <span className="scenario-order">Scenario {scenarioOrder}: </span>}
+                      {scenario.title || scenario.name || 'Untitled Scenario'}
+                    </h3>
+                    <span className="scenario-response-count">
+                      {responseCount} response{responseCount !== 1 ? 's' : ''}
+                    </span>
+                  </div>
                   
                   {/* Heatmap */}
                   {stats && (() => {
@@ -745,7 +814,7 @@ export default function StudyResponsesPage() {
 
         {/* Post-Study Question Responses */}
         {postStudyQuestions.length > 0 && (
-          <section className="responses-section">
+          <section id="post-study-questions" className="responses-section">
             <h2>Post-Study Question Responses</h2>
             <div className="question-responses-list">
               {postStudyQuestions.map((question) => {
@@ -843,6 +912,7 @@ export default function StudyResponsesPage() {
             </div>
           </section>
         )}
+        </div>
       </div>
     </div>
   )
