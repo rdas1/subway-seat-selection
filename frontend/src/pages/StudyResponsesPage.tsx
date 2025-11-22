@@ -534,20 +534,41 @@ export default function StudyResponsesPage() {
                         <h4>Selection Heatmap</h4>
                         {hasGenderQuestion && (
                           <div className="gender-filter-controls">
-                            <label htmlFor={`gender-filter-${scenario.id}`} className="filter-label">
+                            <label className="filter-label">
                               Filter by Gender (from pre-study):
                             </label>
-                            <select
-                              id={`gender-filter-${scenario.id}`}
-                              value={currentFilter}
-                              onChange={(e) => handleGenderFilterChange(scenario.id, e.target.value as 'man' | 'woman' | 'neutral' | 'all')}
-                              className="gender-filter-select"
-                            >
-                              <option value="all">All</option>
-                              {availableGenders.includes('man') && <option value="man">👨 Man</option>}
-                              {availableGenders.includes('woman') && <option value="woman">👩 Woman</option>}
-                              {availableGenders.includes('neutral') && <option value="neutral">🧑 Neutral</option>}
-                            </select>
+                            <div className="gender-filter-buttons">
+                              <button
+                                onClick={() => handleGenderFilterChange(scenario.id, 'all')}
+                                className={`gender-filter-button ${currentFilter === 'all' ? 'active' : ''}`}
+                              >
+                                All
+                              </button>
+                              {availableGenders.includes('man') && (
+                                <button
+                                  onClick={() => handleGenderFilterChange(scenario.id, 'man')}
+                                  className={`gender-filter-button ${currentFilter === 'man' ? 'active' : ''}`}
+                                >
+                                  👨 Man
+                                </button>
+                              )}
+                              {availableGenders.includes('woman') && (
+                                <button
+                                  onClick={() => handleGenderFilterChange(scenario.id, 'woman')}
+                                  className={`gender-filter-button ${currentFilter === 'woman' ? 'active' : ''}`}
+                                >
+                                  👩 Woman
+                                </button>
+                              )}
+                              {availableGenders.includes('neutral') && (
+                                <button
+                                  onClick={() => handleGenderFilterChange(scenario.id, 'neutral')}
+                                  className={`gender-filter-button ${currentFilter === 'neutral' ? 'active' : ''}`}
+                                >
+                                  🧑 Neutral
+                                </button>
+                              )}
+                            </div>
                           </div>
                         )}
                         <div className="heatmap-container">

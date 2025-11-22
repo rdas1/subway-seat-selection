@@ -238,13 +238,19 @@
 
 .filter-label {
   display: block;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
   color: #d7dadc;
   font-size: 0.9rem;
   font-weight: 500;
 }
 
-.gender-filter-select {
+.gender-filter-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.gender-filter-button {
   padding: 0.5rem 1rem;
   background-color: #2d2d2d;
   color: #d7dadc;
@@ -252,17 +258,24 @@
   border-radius: 4px;
   font-size: 0.9rem;
   cursor: pointer;
-  min-width: 200px;
+  transition: all 0.2s;
+  font-family: inherit;
 }
 
-.gender-filter-select:hover {
+.gender-filter-button:hover {
+  background-color: #3a3a3a;
   border-color: #4a90e2;
 }
 
-.gender-filter-select:focus {
+.gender-filter-button.active {
+  background-color: #4a90e2;
+  color: white;
+  border-color: #4a90e2;
+}
+
+.gender-filter-button:focus {
   outline: none;
-  border-color: #4a90e2;
-  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.3);
 }
 
 .response-free-text {

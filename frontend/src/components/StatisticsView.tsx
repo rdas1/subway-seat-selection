@@ -514,24 +514,24 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
 
               <h3>Response Summary</h3>
               {!hideGenderFilter && (
-                <div className="statistics-filters">
-                  <label htmlFor="gender-filter" className="filter-label">
-                    Filter by Gender:
-                  </label>
-                  <select
-                    id="gender-filter"
-                    value={selectedGender}
-                    onChange={(e) => handleGenderChange(e.target.value as 'man' | 'woman' | 'neutral' | 'all')}
-                    disabled={loading}
-                    className="gender-filter-select"
-                  >
-                    <option value="all">All</option>
-                    <option value="man">{EMOJI_MAN} Man</option>
-                    <option value="woman">{EMOJI_WOMAN} Woman</option>
-                    <option value="neutral">{EMOJI_NEUTRAL} Neutral</option>
-                  </select>
-                  {loading && <span className="loading-indicator">Loading...</span>}
-                </div>
+              <div className="statistics-filters">
+                <label htmlFor="gender-filter" className="filter-label">
+                  Filter by Gender:
+                </label>
+                <select
+                  id="gender-filter"
+                  value={selectedGender}
+                  onChange={(e) => handleGenderChange(e.target.value as 'man' | 'woman' | 'neutral' | 'all')}
+                  disabled={loading}
+                  className="gender-filter-select"
+                >
+                  <option value="all">All</option>
+                  <option value="man">{EMOJI_MAN} Man</option>
+                  <option value="woman">{EMOJI_WOMAN} Woman</option>
+                  <option value="neutral">{EMOJI_NEUTRAL} Neutral</option>
+                </select>
+                {loading && <span className="loading-indicator">Loading...</span>}
+              </div>
               )}
               <p><strong>Total Responses:</strong> {statistics.total_responses}</p>
               <p><strong>Seat Selections:</strong> {statistics.seat_selections}</p>
