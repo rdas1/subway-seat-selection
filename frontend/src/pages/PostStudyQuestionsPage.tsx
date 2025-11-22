@@ -18,6 +18,7 @@ export default function PostStudyQuestionsPage() {
   const [loading, setLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState<boolean>(false)
+  const [submitted, setSubmitted] = useState<boolean>(false)
   const [questionResponses, setQuestionResponses] = useState<Map<number, { freeText: string; selectedTagIds: number[] }>>(new Map())
 
   // Validate progress before loading questions
@@ -180,6 +181,10 @@ export default function PostStudyQuestionsPage() {
       // Scroll to top and show completion message
       window.scrollTo({ top: 0, behavior: 'smooth' })
       
+      // Mark as submitted
+      setSubmitting(false)
+      setSubmitted(true)
+      
       // For now, just show a success message - could navigate to a completion page later
       alert('Thank you for completing the study!')
     } catch (err) {
@@ -313,10 +318,10 @@ export default function PostStudyQuestionsPage() {
           <button 
             className="continue-button" 
             onClick={handleSubmit}
-            disabled={!areRequiredQuestionsAnswered || submitting}
-            title={!areRequiredQuestionsAnswered ? 'Please answer all required questions' : ''}
+            disabled={!areRequiredQuestionsAnswered || submitting || submitted}
+            title={!areRequiredQuestionsAnswered ? 'Please answer all required questions' : submitted ? 'Study completed' : ''}
           >
-            {submitting ? 'Submitting...' : 'Complete Study'}
+            {submitted ? 'Submitted' : submitting ? 'Submitting...' : 'Complete Study'}
           </button>
         )}
       </footer>
