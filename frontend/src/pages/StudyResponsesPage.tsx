@@ -333,7 +333,7 @@ export default function StudyResponsesPage() {
                                         )}
                                         {response.gender && (
                                           <span className="response-gender">
-                                            Gender: {response.gender}
+                                             Gender: {response.gender}
                                           </span>
                                         )}
                                       </div>
