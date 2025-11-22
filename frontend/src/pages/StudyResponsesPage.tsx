@@ -189,17 +189,29 @@ export default function StudyResponsesPage() {
 
   // Get gender for a scenario question response, checking pre-study responses if needed
   const getGenderForResponse = (response: QuestionResponseResponse): string | null => {
-    // First check if gender is already in the response
-    if (response.gender) {
+    // If gender is set to "prefer-not-to-say" (default), try to override with pre-study response
+    if (response.gender === 'prefer-not-to-say' && response.user_session_id) {
+      const preStudyGender = getGenderFromPreStudyResponses(response.user_session_id)
+      if (preStudyGender && preStudyGender !== 'prefer-not-to-say') {
+        return preStudyGender
+      }
+    }
+    
+    // If gender is already in the response and not the default, use it
+    if (response.gender && response.gender !== 'prefer-not-to-say') {
       return response.gender
     }
     
-    // If not, try to get it from pre-study responses
+    // If no gender or it's the default, try to get it from pre-study responses
     if (response.user_session_id) {
-      return getGenderFromPreStudyResponses(response.user_session_id)
+      const preStudyGender = getGenderFromPreStudyResponses(response.user_session_id)
+      if (preStudyGender) {
+        return preStudyGender
+      }
     }
     
-    return null
+    // Fall back to the response gender (which might be null or "prefer-not-to-say")
+    return response.gender || null
   }
 
   const toggleScenarioQuestionExpansion = (scenarioId: number, questionId: number) => {
@@ -391,9 +403,11 @@ export default function StudyResponsesPage() {
                                           </span>
                                         )}
                                         {gender && (
-                                          <span className={`response-gender ${!response.gender ? 'gender-from-pre-study' : ''}`}>
+                                          <span className={`response-gender ${(!response.gender || response.gender === 'prefer-not-to-say') && gender !== 'prefer-not-to-say' ? 'gender-from-pre-study' : ''}`}>
                                             Gender: {gender}
-                                            {!response.gender && <span className="gender-source-indicator" title="Gender extracted from pre-study question response">*</span>}
+                                            {(!response.gender || response.gender === 'prefer-not-to-say') && gender !== 'prefer-not-to-say' && (
+                                              <span className="gender-source-indicator" title="Gender extracted from pre-study question response (overriding default 'prefer-not-to-say')">*</span>
+                                            )}
                                           </span>
                                         )}
                                       </div>
