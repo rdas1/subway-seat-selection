@@ -3,6 +3,7 @@ import { SubwayGrid } from '../classes/SubwayGrid'
 import { trainConfigApi, PostResponseQuestionResponse, QuestionResponseCreate } from '../services/api'
 import { EMOJI_MAN, EMOJI_WOMAN, EMOJI_NEUTRAL } from '../constants/emojis'
 import Grid from './Grid'
+import html2canvas from 'html2canvas'
 import './StatisticsView.css'
 import './Grid.css'
 import '../App.css'
@@ -41,6 +42,8 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
     totals: { man: number; woman: number; neutral: number; all: number }
   } | null>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
+  const heatmapContainerRef = useRef<HTMLDivElement>(null)
+  const [exporting, setExporting] = useState(false)
 
   const handleGenderChange = async (gender: 'man' | 'woman' | 'neutral' | 'all') => {
     setSelectedGender(gender)
@@ -325,14 +328,59 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
     // No need for real-time incrementing since counts reflect other users who selected the same tile
   }
 
+  const handleExportHeatmap = async () => {
+    if (!heatmapContainerRef.current) return
+    
+    setExporting(true)
+    try {
+      // Hide tooltip if visible during export
+      setTooltip(null)
+      
+      // Wait a moment for tooltip to disappear
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      const canvas = await html2canvas(heatmapContainerRef.current, {
+        backgroundColor: '#1a1a1a',
+        scale: 2, // Higher resolution
+        logging: false,
+        useCORS: true,
+        allowTaint: true,
+      })
+      
+      // Create download link
+      const link = document.createElement('a')
+      link.download = `heatmap-scenario-${scenarioId}-${new Date().toISOString().split('T')[0]}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+    } catch (error) {
+      console.error('Failed to export heatmap:', error)
+      alert('Failed to export heatmap. Please try again.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="statistics-view">
       <div className="seat-selection-app">
         <div className="grids-container">
           {/* Train grid with heatmap on the left */}
           <div className="statistics-grid-wrapper">
-            {/* Heatmap Legend - moved above the heatmap */}
-            <div className="heatmap-legend heatmap-legend-above">
+            {/* Export Button */}
+            <div className="heatmap-export-controls">
+              <button
+                onClick={handleExportHeatmap}
+                disabled={exporting}
+                className="heatmap-export-button"
+                title="Export heatmap as image"
+              >
+                {exporting ? 'Exporting...' : 'Export Heatmap'}
+              </button>
+            </div>
+            {/* Heatmap container for export */}
+            <div ref={heatmapContainerRef}>
+              {/* Heatmap Legend - moved above the heatmap */}
+              <div className="heatmap-legend heatmap-legend-above">
               <h4>Selection Frequency</h4>
               <div className="heatmap-gradient-bar">
                 <div className="heatmap-gradient-start-indicator"></div>
@@ -409,6 +457,7 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
                   })
                 )}
               </div>
+            </div>
             </div>
           </div>
           
