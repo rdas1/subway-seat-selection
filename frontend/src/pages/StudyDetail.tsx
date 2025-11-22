@@ -787,6 +787,21 @@ export default function StudyDetail() {
           </button>
           <div className="study-detail-header-actions">
             <button 
+              className="view-responses-button"
+              onClick={() => navigate(`/study-builder/${study.id}/responses`)}
+              style={{ 
+                padding: '0.5rem 1rem', 
+                fontSize: '0.9rem',
+                backgroundColor: '#4a90e2',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+              }}
+            >
+              View All Responses
+            </button>
+            <button 
               className="preview-button"
               onClick={() => window.open(`/study/${study.id}`, '_blank')}
             >
@@ -893,9 +908,9 @@ export default function StudyDetail() {
                 >
                   View Responses
                 </button>
-                <button className="section-toggle" aria-label={preStudyQuestionsExpanded ? 'Collapse' : 'Expand'}>
-                  {preStudyQuestionsExpanded ? '−' : '+'}
-                </button>
+              <button className="section-toggle" aria-label={preStudyQuestionsExpanded ? 'Collapse' : 'Expand'}>
+                {preStudyQuestionsExpanded ? '−' : '+'}
+              </button>
               </div>
             </div>
             {preStudyQuestionsExpanded && (
@@ -1293,9 +1308,9 @@ export default function StudyDetail() {
                 >
                   View Responses
                 </button>
-                <button className="section-toggle" aria-label={postStudyQuestionsExpanded ? 'Collapse' : 'Expand'}>
-                  {postStudyQuestionsExpanded ? '−' : '+'}
-                </button>
+              <button className="section-toggle" aria-label={postStudyQuestionsExpanded ? 'Collapse' : 'Expand'}>
+                {postStudyQuestionsExpanded ? '−' : '+'}
+              </button>
               </div>
             </div>
             {postStudyQuestionsExpanded && (

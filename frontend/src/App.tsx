@@ -10,6 +10,7 @@ import VerificationPage from './pages/VerificationPage'
 import PreStudyQuestionsPage from './pages/PreStudyQuestionsPage'
 import PostStudyQuestionsPage from './pages/PostStudyQuestionsPage'
 import StudyScenarioPage from './pages/StudyScenarioPage'
+import StudyResponsesPage from './pages/StudyResponsesPage'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 
 export type PlayerGender = 'man' | 'woman' | 'neutral' | 'prefer-not-to-say'
@@ -151,6 +152,7 @@ function App() {
             <Route path="/verify" element={<VerificationPage />} />
             <Route path="/study-builder" element={<StudyBuilder />} />
             <Route path="/study-builder/:id" element={<StudyDetail />} />
+            <Route path="/study-builder/:id/responses" element={<StudyResponsesPage />} />
           <Route path="/scenario/:id" element={<ScenarioPage />} />
           <Route path="/scenario" element={<ScenarioPage />} />
           <Route path="/study/:id" element={<Navigate to="pre-study-questions" replace />} />

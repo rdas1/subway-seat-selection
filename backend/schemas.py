@@ -252,6 +252,9 @@ class QuestionResponseResponse(BaseModel):
     free_text_response: Optional[str]
     created_at: datetime
     selected_tags: List[QuestionTagResponse] = []
+    row: Optional[int] = None
+    col: Optional[int] = None
+    gender: Optional[str] = None
 
     class Config:
         from_attributes = True

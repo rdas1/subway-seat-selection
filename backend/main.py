@@ -3877,9 +3877,21 @@ async def submit_question_responses(
         result = await db.execute(
             select(QuestionResponse)
             .where(QuestionResponse.id == qr.id)
-            .options(selectinload(QuestionResponse.selected_tags).selectinload(QuestionResponseTag.tag))
+            .options(
+                selectinload(QuestionResponse.selected_tags).selectinload(QuestionResponseTag.tag),
+                selectinload(QuestionResponse.user_response)
+            )
         )
         qr = result.scalar_one()
+        
+        # Get row, col, and gender from the associated user response
+        row = None
+        col = None
+        gender = None
+        if qr.user_response:
+            row = qr.user_response.row
+            col = qr.user_response.col
+            gender = qr.user_response.gender
         
         result_responses.append(QuestionResponseResponse(
             id=qr.id,
@@ -3893,7 +3905,10 @@ async def submit_question_responses(
                 is_default=tag.tag.is_default,
                 created_by_user_id=tag.tag.created_by_user_id,
                 created_at=tag.tag.created_at
-            ) for tag in qr.selected_tags]
+            ) for tag in qr.selected_tags],
+            row=row,
+            col=col,
+            gender=gender
         ))
     
     return result_responses
@@ -4014,7 +4029,8 @@ async def get_question_responses_for_scenario(
         select(QuestionResponse)
         .where(QuestionResponse.post_response_question_id.in_(post_question_ids))
         .options(
-            selectinload(QuestionResponse.selected_tags).selectinload(QuestionResponseTag.tag)
+            selectinload(QuestionResponse.selected_tags).selectinload(QuestionResponseTag.tag),
+            selectinload(QuestionResponse.user_response)
         )
         .order_by(QuestionResponse.created_at.desc())
     )
@@ -4026,6 +4042,15 @@ async def get_question_responses_for_scenario(
         question_id = qr.post_response_question_id
         if question_id not in grouped:
             grouped[question_id] = []
+        
+        # Get row, col, and gender from the associated user response
+        row = None
+        col = None
+        gender = None
+        if qr.user_response:
+            row = qr.user_response.row
+            col = qr.user_response.col
+            gender = qr.user_response.gender
         
         grouped[question_id].append(QuestionResponseResponse(
             id=qr.id,
@@ -4039,7 +4064,10 @@ async def get_question_responses_for_scenario(
                 is_default=tag.tag.is_default,
                 created_by_user_id=tag.tag.created_by_user_id,
                 created_at=tag.tag.created_at
-            ) for tag in qr.selected_tags]
+            ) for tag in qr.selected_tags],
+            row=row,
+            col=col,
+            gender=gender
         ))
     
     return grouped

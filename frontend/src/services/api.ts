@@ -813,6 +813,9 @@ export interface QuestionResponseResponse {
   free_text_response?: string;
   created_at: string;
   selected_tags: QuestionTagResponse[];
+  row?: number;
+  col?: number;
+  gender?: string;
 }
 
 export interface TagStatisticsResponse {
