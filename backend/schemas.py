@@ -255,6 +255,7 @@ class QuestionResponseResponse(BaseModel):
     row: Optional[int] = None
     col: Optional[int] = None
     gender: Optional[str] = None
+    user_session_id: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -108,6 +108,18 @@
   border: 1px solid #404040;
 }
 
+.response-gender.gender-from-pre-study {
+  border-color: #ffa500;
+  background-color: #2a1f0a;
+}
+
+.gender-source-indicator {
+  color: #ffa500;
+  font-weight: bold;
+  margin-left: 0.25rem;
+  font-size: 1.1em;
+}
+
 .response-free-text {
   margin-bottom: 0.5rem;
   line-height: 1.5;

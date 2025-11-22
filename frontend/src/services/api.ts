@@ -816,6 +816,7 @@ export interface QuestionResponseResponse {
   row?: number;
   col?: number;
   gender?: string;
+  user_session_id?: string;
 }
 
 export interface TagStatisticsResponse {

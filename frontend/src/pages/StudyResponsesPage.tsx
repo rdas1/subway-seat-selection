@@ -145,6 +145,63 @@ export default function StudyResponsesPage() {
     setExpandedPostStudyQuestions(newExpanded)
   }
 
+  // Helper function to map gender tag text to gender value
+  const mapGenderTagToValue = (tagText: string): string | null => {
+    const normalized = tagText.toLowerCase().trim()
+    if (normalized === 'man' || normalized === 'male') {
+      return 'man'
+    } else if (normalized === 'woman' || normalized === 'female') {
+      return 'woman'
+    } else if (normalized === 'non-binary' || normalized === 'nonbinary') {
+      return 'neutral'
+    } else if (normalized === 'prefer not to say' || normalized.includes('prefer not')) {
+      return 'prefer-not-to-say'
+    }
+    return null
+  }
+
+  // Create a mapping from user_session_id to gender from pre-study responses
+  const getGenderFromPreStudyResponses = (userSessionId?: string): string | null => {
+    if (!userSessionId) return null
+    
+    // Find the gender identity question (case-insensitive, flexible matching)
+    const genderQuestion = preStudyQuestions.find(q => {
+      const questionText = q.question.question_text.toLowerCase()
+      return questionText.includes('gender identity') || 
+             questionText.includes('what is your gender') ||
+             (questionText.includes('gender') && questionText.includes('identity'))
+    })
+    
+    if (!genderQuestion) return null
+    
+    // Find the response for this session and question
+    const responses = preStudyResponses[genderQuestion.id] || []
+    const response = responses.find(r => r.user_session_id === userSessionId)
+    
+    if (!response || !response.selected_tags || response.selected_tags.length === 0) {
+      return null
+    }
+    
+    // Get the first selected tag and map it to gender value
+    const tagText = response.selected_tags[0].tag_text
+    return mapGenderTagToValue(tagText)
+  }
+
+  // Get gender for a scenario question response, checking pre-study responses if needed
+  const getGenderForResponse = (response: QuestionResponseResponse): string | null => {
+    // First check if gender is already in the response
+    if (response.gender) {
+      return response.gender
+    }
+    
+    // If not, try to get it from pre-study responses
+    if (response.user_session_id) {
+      return getGenderFromPreStudyResponses(response.user_session_id)
+    }
+    
+    return null
+  }
+
   const toggleScenarioQuestionExpansion = (scenarioId: number, questionId: number) => {
     const key = `${scenarioId}-${questionId}`
     const newExpanded = new Set(expandedScenarioQuestions)
@@ -323,7 +380,9 @@ export default function StudyResponsesPage() {
                             ) : (
                               <>
                                 <div className="question-response-items">
-                                  {displayedResponses.map((response) => (
+                                  {displayedResponses.map((response) => {
+                                    const gender = getGenderForResponse(response)
+                                    return (
                                     <div key={response.id} className="question-response-item">
                                       <div className="response-metadata">
                                         {(response.row !== undefined && response.col !== undefined) && (
@@ -331,9 +390,10 @@ export default function StudyResponsesPage() {
                                             Position: Row {response.row}, Col {response.col}
                                           </span>
                                         )}
-                                        {response.gender && (
-                                          <span className="response-gender">
-                                             Gender: {response.gender}
+                                        {gender && (
+                                          <span className={`response-gender ${!response.gender ? 'gender-from-pre-study' : ''}`}>
+                                            Gender: {gender}
+                                            {!response.gender && <span className="gender-source-indicator" title="Gender extracted from pre-study question response">*</span>}
                                           </span>
                                         )}
                                       </div>
@@ -355,7 +415,8 @@ export default function StudyResponsesPage() {
                                         <div className="response-empty">No response provided</div>
                                       )}
                                     </div>
-                                  ))}
+                                    )
+                                  })}
                                 </div>
                                 {hasMore && (
                                   <button

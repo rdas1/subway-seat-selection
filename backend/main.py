@@ -3884,14 +3884,16 @@ async def submit_question_responses(
         )
         qr = result.scalar_one()
         
-        # Get row, col, and gender from the associated user response
+        # Get row, col, gender, and user_session_id from the associated user response
         row = None
         col = None
         gender = None
+        user_session_id = None
         if qr.user_response:
             row = qr.user_response.row
             col = qr.user_response.col
             gender = qr.user_response.gender
+            user_session_id = qr.user_response.user_session_id
         
         result_responses.append(QuestionResponseResponse(
             id=qr.id,
@@ -3908,7 +3910,8 @@ async def submit_question_responses(
             ) for tag in qr.selected_tags],
             row=row,
             col=col,
-            gender=gender
+            gender=gender,
+            user_session_id=user_session_id
         ))
     
     return result_responses
@@ -4043,14 +4046,16 @@ async def get_question_responses_for_scenario(
         if question_id not in grouped:
             grouped[question_id] = []
         
-        # Get row, col, and gender from the associated user response
+        # Get row, col, gender, and user_session_id from the associated user response
         row = None
         col = None
         gender = None
+        user_session_id = None
         if qr.user_response:
             row = qr.user_response.row
             col = qr.user_response.col
             gender = qr.user_response.gender
+            user_session_id = qr.user_response.user_session_id
         
         grouped[question_id].append(QuestionResponseResponse(
             id=qr.id,
@@ -4067,7 +4072,8 @@ async def get_question_responses_for_scenario(
             ) for tag in qr.selected_tags],
             row=row,
             col=col,
-            gender=gender
+            gender=gender,
+            user_session_id=user_session_id
         ))
     
     return grouped
