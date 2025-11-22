@@ -21,9 +21,10 @@ interface StatisticsViewProps {
   userResponseId?: number
   onQuestionResponsesChange?: (responses: QuestionResponseCreate[]) => void
   onValidationChange?: (isValid: boolean) => void
+  hideGenderFilter?: boolean
 }
 
-export default function StatisticsView({ grid, scenarioId, statistics, onStatisticsUpdate, userSelection, userResponseId: _userResponseId, onQuestionResponsesChange, onValidationChange }: StatisticsViewProps) {
+export default function StatisticsView({ grid, scenarioId, statistics, onStatisticsUpdate, userSelection, userResponseId: _userResponseId, onQuestionResponsesChange, onValidationChange, hideGenderFilter = false }: StatisticsViewProps) {
   const [selectedGender, setSelectedGender] = useState<'man' | 'woman' | 'neutral' | 'all'>('all')
   const [loading, setLoading] = useState(false)
   const [questions, setQuestions] = useState<PostResponseQuestionResponse[]>([])
@@ -512,24 +513,26 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
               )}
 
               <h3>Response Summary</h3>
-              <div className="statistics-filters">
-                <label htmlFor="gender-filter" className="filter-label">
-                  Filter by Gender:
-                </label>
-                <select
-                  id="gender-filter"
-                  value={selectedGender}
-                  onChange={(e) => handleGenderChange(e.target.value as 'man' | 'woman' | 'neutral' | 'all')}
-                  disabled={loading}
-                  className="gender-filter-select"
-                >
-                  <option value="all">All</option>
-                  <option value="man">{EMOJI_MAN} Man</option>
-                  <option value="woman">{EMOJI_WOMAN} Woman</option>
-                  <option value="neutral">{EMOJI_NEUTRAL} Neutral</option>
-                </select>
-                {loading && <span className="loading-indicator">Loading...</span>}
-              </div>
+              {!hideGenderFilter && (
+                <div className="statistics-filters">
+                  <label htmlFor="gender-filter" className="filter-label">
+                    Filter by Gender:
+                  </label>
+                  <select
+                    id="gender-filter"
+                    value={selectedGender}
+                    onChange={(e) => handleGenderChange(e.target.value as 'man' | 'woman' | 'neutral' | 'all')}
+                    disabled={loading}
+                    className="gender-filter-select"
+                  >
+                    <option value="all">All</option>
+                    <option value="man">{EMOJI_MAN} Man</option>
+                    <option value="woman">{EMOJI_WOMAN} Woman</option>
+                    <option value="neutral">{EMOJI_NEUTRAL} Neutral</option>
+                  </select>
+                  {loading && <span className="loading-indicator">Loading...</span>}
+                </div>
+              )}
               <p><strong>Total Responses:</strong> {statistics.total_responses}</p>
               <p><strong>Seat Selections:</strong> {statistics.seat_selections}</p>
               <p><strong>Floor Selections:</strong> {statistics.floor_selections}</p>

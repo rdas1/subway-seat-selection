@@ -487,11 +487,13 @@ async def get_user_response(
 async def get_response_statistics(
     config_id: int,
     gender: Optional[str] = None,
+    user_session_ids: Optional[List[str]] = Query(None, description="Filter by user session IDs"),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Get aggregated statistics for responses to a specific train configuration.
-    Optionally filter by gender ('man', 'woman', 'neutral').
+    Optionally filter by gender ('man', 'woman', 'neutral') or by user_session_ids.
+    If both are provided, user_session_ids takes precedence.
     """
     # Verify that the train configuration exists
     config_result = await db.execute(
@@ -505,9 +507,11 @@ async def get_response_statistics(
             detail=f"Train configuration with id {config_id} not found"
         )
     
-    # Get all responses for this configuration, optionally filtered by gender
+    # Get all responses for this configuration, optionally filtered by gender or user_session_ids
     query = select(UserResponse).where(UserResponse.train_configuration_id == config_id)
-    if gender:
+    if user_session_ids:
+        query = query.where(UserResponse.user_session_id.in_(user_session_ids))
+    elif gender:
         query = query.where(UserResponse.gender == gender)
     
     result = await db.execute(query)

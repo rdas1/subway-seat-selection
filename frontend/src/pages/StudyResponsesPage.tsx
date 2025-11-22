@@ -45,6 +45,8 @@ export default function StudyResponsesPage() {
   const [scenarioQuestionResponses, setScenarioQuestionResponses] = useState<Record<number, Record<number, QuestionResponseResponse[]>>>({})
   const [scenarioQuestions, setScenarioQuestions] = useState<Record<number, PostResponseQuestionResponse[]>>({})
   const [expandedScenarioQuestions, setExpandedScenarioQuestions] = useState<Set<string>>(new Set())
+  const [selectedGenderFilter, setSelectedGenderFilter] = useState<Record<number, 'man' | 'woman' | 'neutral' | 'all'>>({})
+  const [genderFilteredStatistics, setGenderFilteredStatistics] = useState<Record<number, Record<string, any>>>({})
 
   useEffect(() => {
     if (!user && !authLoading) {
@@ -114,6 +116,13 @@ export default function StudyResponsesPage() {
             setScenarioStatistics(statsMap)
             setScenarioQuestionResponses(questionResponsesMap)
             setScenarioQuestions(questionsMap)
+            
+            // Initialize gender filter to 'all' for all scenarios
+            const initialFilters: Record<number, 'all'> = {}
+            scenarioList.forEach(scenario => {
+              initialFilters[scenario.id] = 'all'
+            })
+            setSelectedGenderFilter(initialFilters)
           }
         } catch (err) {
           setError(err instanceof Error ? err.message : 'Failed to load study responses')
@@ -185,6 +194,115 @@ export default function StudyResponsesPage() {
     // Get the first selected tag and map it to gender value
     const tagText = response.selected_tags[0].tag_text
     return mapGenderTagToValue(tagText)
+  }
+
+  // Get all user_session_ids for a given gender from pre-study responses
+  const getUserSessionIdsByGender = (gender: 'man' | 'woman' | 'neutral'): string[] => {
+    // Find the gender identity question
+    const genderQuestion = preStudyQuestions.find(q => {
+      const questionText = q.question.question_text.toLowerCase()
+      return questionText.includes('gender identity') || 
+             questionText.includes('what is your gender') ||
+             (questionText.includes('gender') && questionText.includes('identity'))
+    })
+    
+    if (!genderQuestion) return []
+    
+    // Get all responses for this question
+    const responses = preStudyResponses[genderQuestion.id] || []
+    
+    // Filter responses by gender and collect user_session_ids
+    const sessionIds: string[] = []
+    responses.forEach(response => {
+      if (response.selected_tags && response.selected_tags.length > 0) {
+        const tagText = response.selected_tags[0].tag_text
+        const mappedGender = mapGenderTagToValue(tagText)
+        if (mappedGender === gender) {
+          sessionIds.push(response.user_session_id)
+        }
+      }
+    })
+    
+    return sessionIds
+  }
+
+  // Handle gender filter change for a scenario
+  const handleGenderFilterChange = async (scenarioId: number, gender: 'man' | 'woman' | 'neutral' | 'all') => {
+    setSelectedGenderFilter({
+      ...selectedGenderFilter,
+      [scenarioId]: gender
+    })
+    
+    if (gender === 'all') {
+      // Use unfiltered statistics
+      const stats = scenarioStatistics[scenarioId]
+      setGenderFilteredStatistics({
+        ...genderFilteredStatistics,
+        [scenarioId]: { all: stats }
+      })
+      return
+    }
+    
+    // Get user_session_ids for this gender from pre-study responses
+    const sessionIds = getUserSessionIdsByGender(gender)
+    
+    if (sessionIds.length === 0) {
+      // No participants with this gender, show empty statistics
+      setGenderFilteredStatistics({
+        ...genderFilteredStatistics,
+        [scenarioId]: {
+          ...genderFilteredStatistics[scenarioId],
+          [gender]: {
+            total_responses: 0,
+            seat_selections: 0,
+            floor_selections: 0,
+            selection_heatmap: {}
+          }
+        }
+      })
+      return
+    }
+    
+    // Fetch filtered statistics
+    try {
+      const stats = await trainConfigApi.getStatistics(scenarioId, undefined, sessionIds)
+      setGenderFilteredStatistics({
+        ...genderFilteredStatistics,
+        [scenarioId]: {
+          ...genderFilteredStatistics[scenarioId],
+          [gender]: stats
+        }
+      })
+    } catch (err) {
+      console.error(`Failed to fetch filtered statistics for scenario ${scenarioId}:`, err)
+    }
+  }
+
+  // Get available genders from pre-study responses
+  const getAvailableGenders = (): ('man' | 'woman' | 'neutral')[] => {
+    const genderQuestion = preStudyQuestions.find(q => {
+      const questionText = q.question.question_text.toLowerCase()
+      return questionText.includes('gender identity') || 
+             questionText.includes('what is your gender') ||
+             (questionText.includes('gender') && questionText.includes('identity'))
+    })
+    
+    if (!genderQuestion) return []
+    
+    const responses = preStudyResponses[genderQuestion.id] || []
+    const genderSet = new Set<'man' | 'woman' | 'neutral'>()
+    
+    responses.forEach(response => {
+      if (response.selected_tags && response.selected_tags.length > 0) {
+        const tagText = response.selected_tags[0].tag_text
+        const gender = mapGenderTagToValue(tagText)
+        if (gender && gender !== 'prefer-not-to-say' && (gender === 'man' || gender === 'woman' || gender === 'neutral')) {
+          genderSet.add(gender as 'man' | 'woman' | 'neutral')
+        }
+      }
+    })
+    
+    return Array.from(genderSet)
   }
 
   // Get gender for a scenario question response, checking pre-study responses if needed
@@ -403,31 +521,69 @@ export default function StudyResponsesPage() {
                   <h3>{scenario.title || scenario.name || 'Untitled Scenario'}</h3>
                   
                   {/* Heatmap */}
-                  {stats && (
-                    <div className="scenario-heatmap">
-                      <h4>Selection Heatmap</h4>
-                      <div className="heatmap-container">
-                        <StatisticsView
-                          grid={new SubwayGrid(scenario.height, scenario.width, scenario.tiles as any)}
-                          scenarioId={scenario.id}
-                          statistics={stats}
-                          onStatisticsUpdate={(newStats) => {
-                            setScenarioStatistics({
-                              ...scenarioStatistics,
-                              [scenario.id]: newStats
-                            })
-                          }}
-                          userSelection={null}
-                          userResponseId={undefined}
-                        />
+                  {stats && (() => {
+                    const availableGenders = getAvailableGenders()
+                    const hasGenderQuestion = availableGenders.length > 0
+                    const currentFilter = selectedGenderFilter[scenario.id] || 'all'
+                    const filteredStats = hasGenderQuestion && currentFilter !== 'all' 
+                      ? (genderFilteredStatistics[scenario.id]?.[currentFilter] || stats)
+                      : stats
+                    
+                    return (
+                      <div className="scenario-heatmap">
+                        <h4>Selection Heatmap</h4>
+                        {hasGenderQuestion && (
+                          <div className="gender-filter-controls">
+                            <label htmlFor={`gender-filter-${scenario.id}`} className="filter-label">
+                              Filter by Gender (from pre-study):
+                            </label>
+                            <select
+                              id={`gender-filter-${scenario.id}`}
+                              value={currentFilter}
+                              onChange={(e) => handleGenderFilterChange(scenario.id, e.target.value as 'man' | 'woman' | 'neutral' | 'all')}
+                              className="gender-filter-select"
+                            >
+                              <option value="all">All</option>
+                              {availableGenders.includes('man') && <option value="man">👨 Man</option>}
+                              {availableGenders.includes('woman') && <option value="woman">👩 Woman</option>}
+                              {availableGenders.includes('neutral') && <option value="neutral">🧑 Neutral</option>}
+                            </select>
+                          </div>
+                        )}
+                        <div className="heatmap-container">
+                          <StatisticsView
+                            grid={new SubwayGrid(scenario.height, scenario.width, scenario.tiles as any)}
+                            scenarioId={scenario.id}
+                            statistics={filteredStats}
+                            onStatisticsUpdate={(newStats) => {
+                              if (currentFilter === 'all') {
+                                setScenarioStatistics({
+                                  ...scenarioStatistics,
+                                  [scenario.id]: newStats
+                                })
+                              } else {
+                                setGenderFilteredStatistics({
+                                  ...genderFilteredStatistics,
+                                  [scenario.id]: {
+                                    ...genderFilteredStatistics[scenario.id],
+                                    [currentFilter]: newStats
+                                  }
+                                })
+                              }
+                            }}
+                            userSelection={null}
+                            userResponseId={undefined}
+                            hideGenderFilter={hasGenderQuestion}
+                          />
+                        </div>
+                        <div className="heatmap-stats">
+                          <p>Total Responses: {filteredStats.total_responses || 0}</p>
+                          <p>Seat Selections: {filteredStats.seat_selections || 0}</p>
+                          <p>Floor Selections: {filteredStats.floor_selections || 0}</p>
+                        </div>
                       </div>
-                      <div className="heatmap-stats">
-                        <p>Total Responses: {stats.total_responses || 0}</p>
-                        <p>Seat Selections: {stats.seat_selections || 0}</p>
-                        <p>Floor Selections: {stats.floor_selections || 0}</p>
-                      </div>
-                    </div>
-                  )}
+                    )
+                  })()}
                   
                   {/* Scenario Question Responses */}
                   {(() => {

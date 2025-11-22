@@ -107,9 +107,13 @@ export const trainConfigApi = {
     return response.json();
   },
 
-  async getStatistics(id: number, gender?: 'man' | 'woman' | 'neutral' | 'prefer-not-to-say') {
+  async getStatistics(id: number, gender?: 'man' | 'woman' | 'neutral' | 'prefer-not-to-say', userSessionIds?: string[]) {
     const params = new URLSearchParams();
-    if (gender) {
+    if (userSessionIds && userSessionIds.length > 0) {
+      userSessionIds.forEach(sessionId => {
+        params.append('user_session_ids', sessionId);
+      });
+    } else if (gender) {
       params.append('gender', gender);
     }
     const url = `${API_BASE_URL}/train-configurations/${id}/statistics${params.toString() ? `?${params.toString()}` : ''}`;

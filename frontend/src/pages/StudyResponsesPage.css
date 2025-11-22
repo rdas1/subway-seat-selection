@@ -228,6 +228,43 @@
   background-color: #1a1a1a;
 }
 
+.gender-filter-controls {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background-color: #1a1a1a;
+  border-radius: 6px;
+  border: 1px solid #404040;
+}
+
+.filter-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #d7dadc;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.gender-filter-select {
+  padding: 0.5rem 1rem;
+  background-color: #2d2d2d;
+  color: #d7dadc;
+  border: 1px solid #404040;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  min-width: 200px;
+}
+
+.gender-filter-select:hover {
+  border-color: #4a90e2;
+}
+
+.gender-filter-select:focus {
+  outline: none;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+}
+
 .response-free-text {
   margin-bottom: 0.5rem;
   line-height: 1.5;
