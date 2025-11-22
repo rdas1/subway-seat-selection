@@ -225,6 +225,34 @@ export default function StudyResponsesPage() {
     setExpandedScenarioQuestions(newExpanded)
   }
 
+  // Helper function to calculate aggregate tag counts
+  const calculateTagCounts = (responses: (PreStudyQuestionAnswerResponse | PostStudyQuestionAnswerResponse | QuestionResponseResponse)[]): Array<{ tag: string; count: number }> => {
+    const tagCounts: Record<string, number> = {}
+    
+    responses.forEach(response => {
+      if (response.selected_tags && response.selected_tags.length > 0) {
+        response.selected_tags.forEach(tag => {
+          const tagText = tag.tag_text
+          tagCounts[tagText] = (tagCounts[tagText] || 0) + 1
+        })
+      }
+    })
+    
+    return Object.entries(tagCounts)
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count)
+  }
+
+  // Helper function to get unique free text responses
+  const getFreeTextResponses = (responses: (PreStudyQuestionAnswerResponse | PostStudyQuestionAnswerResponse | QuestionResponseResponse)[]): string[] => {
+    const freeTexts = responses
+      .map(r => r.free_text_response)
+      .filter((text): text is string => !!text && text.trim().length > 0)
+    
+    // Return unique responses
+    return Array.from(new Set(freeTexts))
+  }
+
   if (authLoading || loading) {
     return (
       <div className="study-responses-page">
@@ -272,6 +300,8 @@ export default function StudyResponsesPage() {
                 const INITIAL_DISPLAY = 5
                 const displayedResponses = isExpanded ? responses : responses.slice(0, INITIAL_DISPLAY)
                 const hasMore = responses.length > INITIAL_DISPLAY
+                const tagCounts = calculateTagCounts(responses)
+                const freeTexts = getFreeTextResponses(responses)
                 
                 return (
                   <div key={question.id} className="question-response-group">
@@ -281,6 +311,45 @@ export default function StudyResponsesPage() {
                       <p className="no-responses-message">No responses yet.</p>
                     ) : (
                       <>
+                        {/* Aggregate Results */}
+                        <div className="aggregate-results">
+                          <h4 className="aggregate-results-title">Aggregate Results</h4>
+                          
+                          {/* Tag Counts */}
+                          {tagCounts.length > 0 && (
+                            <div className="aggregate-tags">
+                              <h5 className="aggregate-section-title">Tags</h5>
+                              <div className="tag-counts-list">
+                                {tagCounts.map(({ tag, count }) => (
+                                  <div key={tag} className="tag-count-item">
+                                    <span className="tag-count-tag">{tag}</span>
+                                    <span className="tag-count-number">{count}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Free Text Responses */}
+                          {freeTexts.length > 0 && (
+                            <div className="aggregate-free-text">
+                              <h5 className="aggregate-section-title">Free Text Responses ({freeTexts.length} unique)</h5>
+                              <div className="free-text-list">
+                                {freeTexts.map((text, index) => (
+                                  <div key={index} className="free-text-item">
+                                    {text}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Divider */}
+                        <div className="results-divider">
+                          <span className="results-divider-label">Participant Responses</span>
+                        </div>
+                        
                         <div className="question-response-items">
                           {displayedResponses.map((response) => (
                             <div key={response.id} className="question-response-item">
@@ -381,6 +450,9 @@ export default function StudyResponsesPage() {
                           const displayedResponses = isExpanded ? responses : responses.slice(0, INITIAL_DISPLAY)
                           const hasMore = responses.length > INITIAL_DISPLAY
                           
+                          const tagCounts = calculateTagCounts(responses)
+                          const freeTexts = getFreeTextResponses(responses)
+                          
                           return (
                             <div key={questionId} className="question-response-group">
                               <h5 className="question-response-title">
@@ -391,6 +463,45 @@ export default function StudyResponsesPage() {
                               <p className="no-responses-message">No responses yet.</p>
                             ) : (
                               <>
+                                {/* Aggregate Results */}
+                                <div className="aggregate-results">
+                                  <h4 className="aggregate-results-title">Aggregate Results</h4>
+                                  
+                                  {/* Tag Counts */}
+                                  {tagCounts.length > 0 && (
+                                    <div className="aggregate-tags">
+                                      <h5 className="aggregate-section-title">Tags</h5>
+                                      <div className="tag-counts-list">
+                                        {tagCounts.map(({ tag, count }) => (
+                                          <div key={tag} className="tag-count-item">
+                                            <span className="tag-count-tag">{tag}</span>
+                                            <span className="tag-count-number">{count}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Free Text Responses */}
+                                  {freeTexts.length > 0 && (
+                                    <div className="aggregate-free-text">
+                                      <h5 className="aggregate-section-title">Free Text Responses ({freeTexts.length} unique)</h5>
+                                      <div className="free-text-list">
+                                        {freeTexts.map((text, index) => (
+                                          <div key={index} className="free-text-item">
+                                            {text}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                
+                                {/* Divider */}
+                                <div className="results-divider">
+                                  <span className="results-divider-label">Participant Responses</span>
+                                </div>
+                                
                                 <div className="question-response-items">
                                   {displayedResponses.map((response) => {
                                     const gender = getGenderForResponse(response)
@@ -465,6 +576,8 @@ export default function StudyResponsesPage() {
                 const INITIAL_DISPLAY = 5
                 const displayedResponses = isExpanded ? responses : responses.slice(0, INITIAL_DISPLAY)
                 const hasMore = responses.length > INITIAL_DISPLAY
+                const tagCounts = calculateTagCounts(responses)
+                const freeTexts = getFreeTextResponses(responses)
                 
                 return (
                   <div key={question.id} className="question-response-group">
@@ -474,6 +587,45 @@ export default function StudyResponsesPage() {
                       <p className="no-responses-message">No responses yet.</p>
                     ) : (
                       <>
+                        {/* Aggregate Results */}
+                        <div className="aggregate-results">
+                          <h4 className="aggregate-results-title">Aggregate Results</h4>
+                          
+                          {/* Tag Counts */}
+                          {tagCounts.length > 0 && (
+                            <div className="aggregate-tags">
+                              <h5 className="aggregate-section-title">Tags</h5>
+                              <div className="tag-counts-list">
+                                {tagCounts.map(({ tag, count }) => (
+                                  <div key={tag} className="tag-count-item">
+                                    <span className="tag-count-tag">{tag}</span>
+                                    <span className="tag-count-number">{count}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* Free Text Responses */}
+                          {freeTexts.length > 0 && (
+                            <div className="aggregate-free-text">
+                              <h5 className="aggregate-section-title">Free Text Responses ({freeTexts.length} unique)</h5>
+                              <div className="free-text-list">
+                                {freeTexts.map((text, index) => (
+                                  <div key={index} className="free-text-item">
+                                    {text}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Divider */}
+                        <div className="results-divider">
+                          <span className="results-divider-label">Participant Responses</span>
+                        </div>
+                        
                         <div className="question-response-items">
                           {displayedResponses.map((response) => (
                             <div key={response.id} className="question-response-item">
