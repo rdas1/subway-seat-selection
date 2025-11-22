@@ -595,6 +595,7 @@ export default function StudyResponsesPage() {
                             userSelection={null}
                             userResponseId={undefined}
                             hideGenderFilter={hasGenderQuestion}
+                            userSessionIds={hasGenderQuestion && currentFilter !== 'all' ? getUserSessionIdsByGender(currentFilter) : undefined}
                           />
                         </div>
                         <div className="heatmap-stats">

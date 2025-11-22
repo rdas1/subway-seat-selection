@@ -3927,11 +3927,13 @@ async def get_tag_statistics(
     post_response_question_id: int,
     row: int = Query(None, description="Filter by tile row (optional)"),
     col: int = Query(None, description="Filter by tile column (optional)"),
+    user_session_ids: Optional[List[str]] = Query(None, description="Filter by user session IDs (optional)"),
     db: AsyncSession = Depends(get_db)
 ):
     """
     Get tag usage statistics for a question.
     If row and col are provided, only count tags from users who selected that tile.
+    If user_session_ids are provided, only count tags from those user sessions.
     """
     # Verify post-response question exists and belongs to config
     result = await db.execute(
@@ -3965,11 +3967,18 @@ async def get_tag_statistics(
                 UserResponse.col == col
             )
         )
+        if user_session_ids:
+            query = query.where(UserResponse.user_session_id.in_(user_session_ids))
     else:
         # Get all question responses for this question
-        query = select(QuestionResponse).where(
+        query = select(QuestionResponse).join(
+            UserResponse,
+            QuestionResponse.user_response_id == UserResponse.id
+        ).where(
             QuestionResponse.post_response_question_id == post_response_question_id
         )
+        if user_session_ids:
+            query = query.where(UserResponse.user_session_id.in_(user_session_ids))
     
     query = query.options(selectinload(QuestionResponse.selected_tags))
     

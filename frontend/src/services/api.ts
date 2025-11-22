@@ -199,11 +199,16 @@ export const trainConfigApi = {
     }
   },
 
-  async getTagStatistics(configId: number, questionId: number, row?: number, col?: number): Promise<TagStatisticsResponse[]> {
+  async getTagStatistics(configId: number, questionId: number, row?: number, col?: number, userSessionIds?: string[]): Promise<TagStatisticsResponse[]> {
     const params = new URLSearchParams();
     if (row !== undefined && col !== undefined) {
       params.append('row', row.toString());
       params.append('col', col.toString());
+    }
+    if (userSessionIds && userSessionIds.length > 0) {
+      userSessionIds.forEach(sessionId => {
+        params.append('user_session_ids', sessionId);
+      });
     }
     const url = `${API_BASE_URL}/train-configurations/${configId}/questions/${questionId}/tag-statistics${params.toString() ? `?${params.toString()}` : ''}`;
     const response = await fetchWithCredentials(url);

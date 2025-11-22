@@ -22,9 +22,10 @@ interface StatisticsViewProps {
   onQuestionResponsesChange?: (responses: QuestionResponseCreate[]) => void
   onValidationChange?: (isValid: boolean) => void
   hideGenderFilter?: boolean
+  userSessionIds?: string[]
 }
 
-export default function StatisticsView({ grid, scenarioId, statistics, onStatisticsUpdate, userSelection, userResponseId: _userResponseId, onQuestionResponsesChange, onValidationChange, hideGenderFilter = false }: StatisticsViewProps) {
+export default function StatisticsView({ grid, scenarioId, statistics, onStatisticsUpdate, userSelection, userResponseId: _userResponseId, onQuestionResponsesChange, onValidationChange, hideGenderFilter = false, userSessionIds }: StatisticsViewProps) {
   const [selectedGender, setSelectedGender] = useState<'man' | 'woman' | 'neutral' | 'all'>('all')
   const [loading, setLoading] = useState(false)
   const [questions, setQuestions] = useState<PostResponseQuestionResponse[]>([])
@@ -116,14 +117,14 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
         })
         setQuestionResponses(initialResponses)
         
-        // Load tag statistics for each question, filtered by user's tile selection
+        // Load tag statistics for each question, filtered by user's tile selection and/or user_session_ids
         const statsMap = new Map<number, Map<number, number>>()
         for (const question of questionsData) {
           try {
-            // Only filter by tile if user has made a selection
+            // Filter by tile if user has made a selection, and/or by user_session_ids if provided
             const stats = userSelection 
-              ? await trainConfigApi.getTagStatistics(scenarioId, question.id, userSelection.row, userSelection.col)
-              : await trainConfigApi.getTagStatistics(scenarioId, question.id)
+              ? await trainConfigApi.getTagStatistics(scenarioId, question.id, userSelection.row, userSelection.col, userSessionIds)
+              : await trainConfigApi.getTagStatistics(scenarioId, question.id, undefined, undefined, userSessionIds)
             const tagCountMap = new Map<number, number>()
             stats.forEach(stat => {
               tagCountMap.set(stat.tag_id, stat.selection_count)
@@ -142,7 +143,7 @@ export default function StatisticsView({ grid, scenarioId, statistics, onStatist
       }
     }
     loadQuestions()
-  }, [scenarioId, userSelection])
+  }, [scenarioId, userSelection, userSessionIds])
 
   // Check if all required questions are answered (memoized)
   const areRequiredQuestionsAnswered = useMemo(() => {
