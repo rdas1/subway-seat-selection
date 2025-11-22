@@ -2889,6 +2889,144 @@ async def get_post_study_question_responses(
     ) for r in responses]
 
 
+# Pre-Study Question Response Endpoints (Authenticated - for researchers)
+
+@app.get("/studies/{study_id}/pre-study-question-responses/all", response_model=Dict[int, List[PreStudyQuestionAnswerResponse]])
+async def get_all_pre_study_question_responses(
+    study_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all pre-study question responses for a study, grouped by question_id.
+    Returns a dictionary mapping question_id -> list of responses.
+    Authenticated endpoint - requires user authentication.
+    """
+    # Verify study exists and user has access
+    study_result = await db.execute(
+        select(Study).where(Study.id == study_id)
+    )
+    study = study_result.scalar_one_or_none()
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    # Get all pre-study questions for this study
+    questions_result = await db.execute(
+        select(PreStudyQuestion).where(PreStudyQuestion.study_id == study_id)
+    )
+    questions = questions_result.scalars().all()
+    question_ids = [q.id for q in questions]
+    
+    if not question_ids:
+        return {}
+    
+    # Get all responses for these questions
+    result = await db.execute(
+        select(PreStudyQuestionResponse)
+        .where(PreStudyQuestionResponse.pre_study_question_id.in_(question_ids))
+        .options(selectinload(PreStudyQuestionResponse.selected_tags).selectinload(PreStudyQuestionResponseTag.tag))
+        .order_by(PreStudyQuestionResponse.created_at.desc())
+    )
+    responses = result.scalars().all()
+    
+    # Group by question_id
+    grouped = {}
+    for r in responses:
+        question_id = r.pre_study_question_id
+        if question_id not in grouped:
+            grouped[question_id] = []
+        
+        grouped[question_id].append(PreStudyQuestionAnswerResponse(
+            id=r.id,
+            pre_study_question_id=r.pre_study_question_id,
+            user_session_id=r.user_session_id,
+            user_id=r.user_id,
+            free_text_response=r.free_text_response,
+            created_at=r.created_at,
+            selected_tags=[QuestionTagResponse(
+                id=tag.tag.id,
+                tag_text=tag.tag.tag_text,
+                is_default=tag.tag.is_default,
+                created_by_user_id=tag.tag.created_by_user_id,
+                created_at=tag.tag.created_at
+            ) for tag in r.selected_tags]
+        ))
+    
+    return grouped
+
+
+# Post-Study Question Response Endpoints (Authenticated - for researchers)
+
+@app.get("/studies/{study_id}/post-study-question-responses/all", response_model=Dict[int, List[PostStudyQuestionAnswerResponse]])
+async def get_all_post_study_question_responses(
+    study_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get all post-study question responses for a study, grouped by question_id.
+    Returns a dictionary mapping question_id -> list of responses.
+    Authenticated endpoint - requires user authentication.
+    """
+    # Verify study exists and user has access
+    study_result = await db.execute(
+        select(Study).where(Study.id == study_id)
+    )
+    study = study_result.scalar_one_or_none()
+    if study is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study with id {study_id} not found"
+        )
+    
+    # Get all post-study questions for this study
+    questions_result = await db.execute(
+        select(PostStudyQuestion).where(PostStudyQuestion.study_id == study_id)
+    )
+    questions = questions_result.scalars().all()
+    question_ids = [q.id for q in questions]
+    
+    if not question_ids:
+        return {}
+    
+    # Get all responses for these questions
+    result = await db.execute(
+        select(PostStudyQuestionResponse)
+        .where(PostStudyQuestionResponse.post_study_question_id.in_(question_ids))
+        .options(selectinload(PostStudyQuestionResponse.selected_tags).selectinload(PostStudyQuestionResponseTag.tag))
+        .order_by(PostStudyQuestionResponse.created_at.desc())
+    )
+    responses = result.scalars().all()
+    
+    # Group by question_id
+    grouped = {}
+    for r in responses:
+        question_id = r.post_study_question_id
+        if question_id not in grouped:
+            grouped[question_id] = []
+        
+        grouped[question_id].append(PostStudyQuestionAnswerResponse(
+            id=r.id,
+            post_study_question_id=r.post_study_question_id,
+            user_session_id=r.user_session_id,
+            user_id=r.user_id,
+            free_text_response=r.free_text_response,
+            created_at=r.created_at,
+            selected_tags=[QuestionTagResponse(
+                id=tag.tag.id,
+                tag_text=tag.tag.tag_text,
+                is_default=tag.tag.is_default,
+                created_by_user_id=tag.tag.created_by_user_id,
+                created_at=tag.tag.created_at
+            ) for tag in r.selected_tags]
+        ))
+    
+    return grouped
+
+
 # Study Progress Endpoints (Public - for study participants)
 
 @app.get("/studies/{study_id}/progress", response_model=StudyProgressResponse)

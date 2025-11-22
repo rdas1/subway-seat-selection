@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { studyApi, StudyResponse, trainConfigApi, scenarioGroupApi, PostResponseQuestionResponse, PostResponseQuestionCreate, questionApi, TagLibraryResponse, QuestionResponseResponse, TrainConfigurationResponse, preStudyQuestionApi, PreStudyQuestionResponse, PreStudyQuestionCreate, postStudyQuestionApi, PostStudyQuestionResponse, PostStudyQuestionCreate, QuestionTagResponse } from '../services/api'
+import { studyApi, StudyResponse, trainConfigApi, scenarioGroupApi, PostResponseQuestionResponse, PostResponseQuestionCreate, questionApi, TagLibraryResponse, QuestionResponseResponse, TrainConfigurationResponse, preStudyQuestionApi, PreStudyQuestionResponse, PreStudyQuestionCreate, postStudyQuestionApi, PostStudyQuestionResponse, PostStudyQuestionCreate, QuestionTagResponse, preStudyQuestionResponseApi, PreStudyQuestionAnswerResponse, postStudyQuestionResponseApi, PostStudyQuestionAnswerResponse } from '../services/api'
 import { Tile } from '../types/grid'
 import { useAuth } from '../contexts/AuthContext'
 import { formatRelativeTime } from '../utils/time'
@@ -84,6 +84,14 @@ export default function StudyDetail() {
   const [postStudyQuestionsExpanded, setPostStudyQuestionsExpanded] = useState<boolean>(true)
   const [showPostStudyQuestionTemplates, setShowPostStudyQuestionTemplates] = useState<boolean>(false)
   const [scenariosExpanded, setScenariosExpanded] = useState<boolean>(true)
+  const [viewingPreStudyResponses, setViewingPreStudyResponses] = useState<boolean>(false)
+  const [preStudyQuestionResponses, setPreStudyQuestionResponses] = useState<Record<number, PreStudyQuestionAnswerResponse[]>>({})
+  const [loadingPreStudyQuestionResponses, setLoadingPreStudyQuestionResponses] = useState<boolean>(false)
+  const [viewingPostStudyResponses, setViewingPostStudyResponses] = useState<boolean>(false)
+  const [postStudyQuestionResponses, setPostStudyQuestionResponses] = useState<Record<number, PostStudyQuestionAnswerResponse[]>>({})
+  const [loadingPostStudyQuestionResponses, setLoadingPostStudyQuestionResponses] = useState<boolean>(false)
+  const [expandedPreStudyQuestions, setExpandedPreStudyQuestions] = useState<Set<number>>(new Set())
+  const [expandedPostStudyQuestions, setExpandedPostStudyQuestions] = useState<Set<number>>(new Set())
   const titleDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const descriptionDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -411,6 +419,72 @@ export default function StudyDetail() {
       newExpanded.add(questionId)
     }
     setExpandedQuestions(newExpanded)
+  }
+
+  const handleViewPreStudyResponses = async () => {
+    if (!study?.id) return
+    
+    setViewingPreStudyResponses(true)
+    setLoadingPreStudyQuestionResponses(true)
+    setError(null)
+    
+    try {
+      const responses = await preStudyQuestionResponseApi.getAll(study.id)
+      setPreStudyQuestionResponses(responses)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load pre-study question responses')
+    } finally {
+      setLoadingPreStudyQuestionResponses(false)
+    }
+  }
+
+  const handleClosePreStudyResponsesView = () => {
+    setViewingPreStudyResponses(false)
+    setPreStudyQuestionResponses({})
+    setExpandedPreStudyQuestions(new Set())
+  }
+
+  const togglePreStudyQuestionExpansion = (questionId: number) => {
+    const newExpanded = new Set(expandedPreStudyQuestions)
+    if (newExpanded.has(questionId)) {
+      newExpanded.delete(questionId)
+    } else {
+      newExpanded.add(questionId)
+    }
+    setExpandedPreStudyQuestions(newExpanded)
+  }
+
+  const handleViewPostStudyResponses = async () => {
+    if (!study?.id) return
+    
+    setViewingPostStudyResponses(true)
+    setLoadingPostStudyQuestionResponses(true)
+    setError(null)
+    
+    try {
+      const responses = await postStudyQuestionResponseApi.getAll(study.id)
+      setPostStudyQuestionResponses(responses)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load post-study question responses')
+    } finally {
+      setLoadingPostStudyQuestionResponses(false)
+    }
+  }
+
+  const handleClosePostStudyResponsesView = () => {
+    setViewingPostStudyResponses(false)
+    setPostStudyQuestionResponses({})
+    setExpandedPostStudyQuestions(new Set())
+  }
+
+  const togglePostStudyQuestionExpansion = (questionId: number) => {
+    const newExpanded = new Set(expandedPostStudyQuestions)
+    if (newExpanded.has(questionId)) {
+      newExpanded.delete(questionId)
+    } else {
+      newExpanded.add(questionId)
+    }
+    setExpandedPostStudyQuestions(newExpanded)
   }
 
   // Handle creating a new scenario
@@ -808,9 +882,21 @@ export default function StudyDetail() {
           <div className="pre-study-questions-section">
             <div className="section-header" onClick={() => setPreStudyQuestionsExpanded(!preStudyQuestionsExpanded)}>
               <h2 className="section-title">Pre-Study Questions ({preStudyQuestions.length})</h2>
-              <button className="section-toggle" aria-label={preStudyQuestionsExpanded ? 'Collapse' : 'Expand'}>
-                {preStudyQuestionsExpanded ? '−' : '+'}
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleViewPreStudyResponses()
+                  }}
+                  className="view-responses-button"
+                  style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+                >
+                  View Responses
+                </button>
+                <button className="section-toggle" aria-label={preStudyQuestionsExpanded ? 'Collapse' : 'Expand'}>
+                  {preStudyQuestionsExpanded ? '−' : '+'}
+                </button>
+              </div>
             </div>
             {preStudyQuestionsExpanded && (
               <>
@@ -1196,9 +1282,21 @@ export default function StudyDetail() {
           <div className="pre-study-questions-section">
             <div className="section-header" onClick={() => setPostStudyQuestionsExpanded(!postStudyQuestionsExpanded)}>
               <h2 className="section-title">Post-Study Questions ({postStudyQuestions.length})</h2>
-              <button className="section-toggle" aria-label={postStudyQuestionsExpanded ? 'Collapse' : 'Expand'}>
-                {postStudyQuestionsExpanded ? '−' : '+'}
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleViewPostStudyResponses()
+                  }}
+                  className="view-responses-button"
+                  style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+                >
+                  View Responses
+                </button>
+                <button className="section-toggle" aria-label={postStudyQuestionsExpanded ? 'Collapse' : 'Expand'}>
+                  {postStudyQuestionsExpanded ? '−' : '+'}
+                </button>
+              </div>
             </div>
             {postStudyQuestionsExpanded && (
               <>
@@ -1560,6 +1658,160 @@ export default function StudyDetail() {
                       </div>
                     )
                   })()}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* View Pre-Study Question Responses Modal */}
+      {viewingPreStudyResponses && (
+        <div className="view-responses-overlay" onClick={handleClosePreStudyResponsesView}>
+          <div className="view-responses-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="view-responses-header">
+              <h2>Pre-Study Question Responses</h2>
+              <button onClick={handleClosePreStudyResponsesView} className="close-modal">×</button>
+            </div>
+            {loadingPreStudyQuestionResponses ? (
+              <div className="view-responses-loading">Loading responses...</div>
+            ) : (
+              <div className="view-responses-content" style={{ justifyContent: 'center' }}>
+                <div className="view-responses-panel" style={{ width: '100%', maxWidth: '800px' }}>
+                  <h3>Question Responses</h3>
+                  {preStudyQuestions.length === 0 ? (
+                    <p className="no-responses-message">No pre-study questions for this study.</p>
+                  ) : (
+                    <div className="question-responses-list">
+                      {preStudyQuestions.map((question) => {
+                        const responses = preStudyQuestionResponses[question.id] || []
+                        const isExpanded = expandedPreStudyQuestions.has(question.id)
+                        const INITIAL_DISPLAY = 5
+                        const displayedResponses = isExpanded ? responses : responses.slice(0, INITIAL_DISPLAY)
+                        const hasMore = responses.length > INITIAL_DISPLAY
+                        
+                        return (
+                          <div key={question.id} className="question-response-group">
+                            <h4 className="question-response-title">{question.question.question_text}</h4>
+                            {responses.length === 0 ? (
+                              <p className="no-responses-message">No responses yet.</p>
+                            ) : (
+                              <>
+                                <div className="question-response-items">
+                                  {displayedResponses.map((response) => (
+                                    <div key={response.id} className="question-response-item">
+                                      {response.free_text_response && (
+                                        <div className="response-free-text">
+                                          {response.free_text_response}
+                                        </div>
+                                      )}
+                                      {response.selected_tags.length > 0 && (
+                                        <div className="response-tags">
+                                          {response.selected_tags.map((tag) => (
+                                            <span key={tag.id} className="response-tag">
+                                              {tag.tag_text}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {!response.free_text_response && response.selected_tags.length === 0 && (
+                                        <div className="response-empty">No response provided</div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                                {hasMore && (
+                                  <button
+                                    onClick={() => togglePreStudyQuestionExpansion(question.id)}
+                                    className="view-more-button"
+                                  >
+                                    {isExpanded ? 'Show Less' : `View More (${responses.length - INITIAL_DISPLAY} more)`}
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* View Post-Study Question Responses Modal */}
+      {viewingPostStudyResponses && (
+        <div className="view-responses-overlay" onClick={handleClosePostStudyResponsesView}>
+          <div className="view-responses-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="view-responses-header">
+              <h2>Post-Study Question Responses</h2>
+              <button onClick={handleClosePostStudyResponsesView} className="close-modal">×</button>
+            </div>
+            {loadingPostStudyQuestionResponses ? (
+              <div className="view-responses-loading">Loading responses...</div>
+            ) : (
+              <div className="view-responses-content" style={{ justifyContent: 'center' }}>
+                <div className="view-responses-panel" style={{ width: '100%', maxWidth: '800px' }}>
+                  <h3>Question Responses</h3>
+                  {postStudyQuestions.length === 0 ? (
+                    <p className="no-responses-message">No post-study questions for this study.</p>
+                  ) : (
+                    <div className="question-responses-list">
+                      {postStudyQuestions.map((question) => {
+                        const responses = postStudyQuestionResponses[question.id] || []
+                        const isExpanded = expandedPostStudyQuestions.has(question.id)
+                        const INITIAL_DISPLAY = 5
+                        const displayedResponses = isExpanded ? responses : responses.slice(0, INITIAL_DISPLAY)
+                        const hasMore = responses.length > INITIAL_DISPLAY
+                        
+                        return (
+                          <div key={question.id} className="question-response-group">
+                            <h4 className="question-response-title">{question.question.question_text}</h4>
+                            {responses.length === 0 ? (
+                              <p className="no-responses-message">No responses yet.</p>
+                            ) : (
+                              <>
+                                <div className="question-response-items">
+                                  {displayedResponses.map((response) => (
+                                    <div key={response.id} className="question-response-item">
+                                      {response.free_text_response && (
+                                        <div className="response-free-text">
+                                          {response.free_text_response}
+                                        </div>
+                                      )}
+                                      {response.selected_tags.length > 0 && (
+                                        <div className="response-tags">
+                                          {response.selected_tags.map((tag) => (
+                                            <span key={tag.id} className="response-tag">
+                                              {tag.tag_text}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {!response.free_text_response && response.selected_tags.length === 0 && (
+                                        <div className="response-empty">No response provided</div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                                {hasMore && (
+                                  <button
+                                    onClick={() => togglePostStudyQuestionExpansion(question.id)}
+                                    className="view-more-button"
+                                  >
+                                    {isExpanded ? 'Show Less' : `View More (${responses.length - INITIAL_DISPLAY} more)`}
+                                  </button>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

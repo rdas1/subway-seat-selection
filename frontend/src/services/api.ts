@@ -901,6 +901,16 @@ export const preStudyQuestionResponseApi = {
 
     return response.json();
   },
+
+  async getAll(studyId: number): Promise<Record<number, PreStudyQuestionAnswerResponse[]>> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${studyId}/pre-study-question-responses/all`);
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch all pre-study question responses');
+    }
+
+    return response.json();
+  },
 };
 
 // Post-Study Question Response API
@@ -947,6 +957,16 @@ export const postStudyQuestionResponseApi = {
 
     if (!response.ok) {
       throw new Error('Failed to fetch post-study question responses');
+    }
+
+    return response.json();
+  },
+
+  async getAll(studyId: number): Promise<Record<number, PostStudyQuestionAnswerResponse[]>> {
+    const response = await fetchWithCredentials(`${API_BASE_URL}/studies/${studyId}/post-study-question-responses/all`);
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch all post-study question responses');
     }
 
     return response.json();
