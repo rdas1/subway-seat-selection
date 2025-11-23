@@ -36,8 +36,8 @@ export default function VerificationPage() {
       // Use user from response directly to avoid immediate /auth/me call
       if (authResponse.user) {
         setUser(authResponse.user)
-        // Small delay to ensure cookie is processed before navigation
-        await new Promise(resolve => setTimeout(resolve, 200))
+        // Longer delay to ensure cookie is fully processed before navigation and any subsequent API calls
+        await new Promise(resolve => setTimeout(resolve, 1000))
       } else {
         // Fallback to checkAuth if user not in response
         await checkAuth()
@@ -76,8 +76,8 @@ export default function VerificationPage() {
       // Use user from response directly to avoid immediate /auth/me call
       if (authResponse.user) {
         setUser(authResponse.user)
-        // Small delay to ensure cookie is processed before navigation
-        await new Promise(resolve => setTimeout(resolve, 200))
+        // Longer delay to ensure cookie is fully processed before navigation and any subsequent API calls
+        await new Promise(resolve => setTimeout(resolve, 1000))
       } else {
         // Fallback to checkAuth if user not in response
         await checkAuth()
