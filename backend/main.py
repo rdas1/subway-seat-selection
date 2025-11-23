@@ -644,12 +644,14 @@ async def verify_link(
     # For cross-origin cookies with samesite="none", do NOT set domain attribute
     # The browser will send the cookie to the backend domain regardless of where the request originates
     # IMPORTANT: secure=True is REQUIRED when samesite="none"
+    # Set path="/" to ensure cookie is available for all paths on the backend domain
     response.set_cookie(
         key="session_token",
         value=access_token,
         httponly=True,
         secure=is_production,  # HTTPS only in production (required for samesite="none")
         samesite="none" if is_production else "lax",  # Allow cross-origin cookies in production
+        path="/",  # Make cookie available for all paths on the backend domain
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert minutes to seconds
     )
     
@@ -718,12 +720,14 @@ async def verify_token(
     # For cross-origin cookies with samesite="none", do NOT set domain attribute
     # The browser will send the cookie to the backend domain regardless of where the request originates
     # IMPORTANT: secure=True is REQUIRED when samesite="none"
+    # Set path="/" to ensure cookie is available for all paths on the backend domain
     response.set_cookie(
         key="session_token",
         value=access_token,
         httponly=True,
         secure=is_production,  # HTTPS only in production (required for samesite="none")
         samesite="none" if is_production else "lax",  # Allow cross-origin cookies in production
+        path="/",  # Make cookie available for all paths on the backend domain
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert minutes to seconds
     )
     
