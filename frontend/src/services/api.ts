@@ -538,6 +538,9 @@ export const studyApi = {
     const response = await fetchWithCredentials(`${API_BASE_URL}/studies?skip=${skip}&limit=${limit}`);
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Not authenticated');
+      }
       throw new Error('Failed to fetch studies');
     }
 

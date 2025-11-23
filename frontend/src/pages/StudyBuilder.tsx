@@ -23,15 +23,30 @@ export default function StudyBuilder() {
   // Load studies when user is authenticated - must be before any conditional returns
   useEffect(() => {
     if (user) {
-      const loadStudies = async () => {
+      const loadStudies = async (retryCount = 0) => {
         setLoadingStudies(true)
         setStudiesError(null)
         try {
+          // Add delay on first attempt to give cookie time to be processed
+          if (retryCount === 0) {
+            await new Promise(resolve => setTimeout(resolve, 300))
+          }
           const data = await studyApi.getAll()
           setStudies(data)
+          setLoadingStudies(false)
         } catch (err) {
+          // If we get a 401 and haven't retried yet, wait and retry (cookie might not be ready)
+          const is401 = err instanceof Error && (
+            err.message === 'Not authenticated' ||
+            err.message.includes('401') || 
+            err.message.includes('Unauthorized')
+          )
+          if (retryCount < 2 && is401) {
+            // Wait longer for retries: 500ms, 1000ms
+            await new Promise(resolve => setTimeout(resolve, 500 * (retryCount + 1)))
+            return loadStudies(retryCount + 1)
+          }
           setStudiesError(err instanceof Error ? err.message : 'Failed to load studies')
-        } finally {
           setLoadingStudies(false)
         }
       }
