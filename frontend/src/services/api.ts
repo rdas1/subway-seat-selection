@@ -3,16 +3,44 @@ import { Tile } from '../types/grid';
 // Use /api prefix which is proxied to the backend by Vite
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
+// Helper function to get token from localStorage
+const getStoredToken = (): string | null => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('auth_token');
+  }
+  return null;
+};
+
+// Helper function to store token in localStorage
+const storeToken = (token: string): void => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('auth_token', token);
+  }
+};
+
 // Helper function for fetch with credentials
 const fetchWithCredentials = async (url: string, options: RequestInit = {}) => {
-  return fetch(url, {
+  // Get token from localStorage as fallback if cookies are blocked
+  const storedToken = getStoredToken();
+  
+  // Ensure credentials are always included for cross-origin requests
+  const fetchOptions: RequestInit = {
     ...options,
-    credentials: 'include', // Include cookies in all requests
+    credentials: 'include', // Include cookies in all requests (required for cross-origin)
+    mode: 'cors', // Explicitly set CORS mode
     headers: {
       'Content-Type': 'application/json',
+      ...(storedToken && { 'Authorization': `Bearer ${storedToken}` }), // Add Authorization header as fallback
       ...options.headers,
     },
-  });
+  };
+  
+  // Debug logging in development
+  if (import.meta.env.DEV) {
+    console.log('Fetch request:', url, fetchOptions);
+  }
+  
+  return fetch(url, fetchOptions);
 };
 
 export interface TrainConfigurationCreate {
@@ -356,6 +384,7 @@ export interface User {
 export interface AuthResponse {
   user: User;
   message: string;
+  token?: string; // Token for localStorage fallback when cookies are blocked
 }
 
 export const authApi = {
@@ -381,7 +410,12 @@ export const authApi = {
       throw new Error(error.detail || 'Failed to verify link');
     }
 
-    return response.json();
+    const authResponse = await response.json();
+    // Store token in localStorage as fallback for browsers that block cookies
+    if (authResponse.token) {
+      storeToken(authResponse.token);
+    }
+    return authResponse;
   },
 
   async verifyToken(email: string, verificationCode: string): Promise<AuthResponse> {
@@ -395,7 +429,12 @@ export const authApi = {
       throw new Error(error.detail || 'Failed to verify token');
     }
 
-    return response.json();
+    const authResponse = await response.json();
+    // Store token in localStorage as fallback for browsers that block cookies
+    if (authResponse.token) {
+      storeToken(authResponse.token);
+    }
+    return authResponse;
   },
 
   async logout(): Promise<{ message: string }> {
@@ -407,11 +446,27 @@ export const authApi = {
       throw new Error('Failed to logout');
     }
 
+    // Clear token from localStorage on logout
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('auth_token');
+    }
+
     return response.json();
   },
 
   async getCurrentUser(): Promise<User> {
+    // Debug: Check if cookies are available
+    if (typeof document !== 'undefined') {
+      const cookies = document.cookie;
+      console.log('Cookies before /auth/me request:', cookies);
+      console.log('API_BASE_URL:', API_BASE_URL);
+    }
+    
     const response = await fetchWithCredentials(`${API_BASE_URL}/auth/me`);
+    
+    // Debug: Check response headers
+    console.log('Response headers for /auth/me:', Object.fromEntries(response.headers.entries()));
+    console.log('Response status:', response.status);
 
     if (!response.ok) {
       if (response.status === 401) {

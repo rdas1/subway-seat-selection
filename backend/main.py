@@ -657,7 +657,8 @@ async def verify_link(
     
     return AuthResponse(
         user=UserResponseSchema(id=user.id, email=user.email, created_at=user.created_at),
-        message="Authentication successful"
+        message="Authentication successful",
+        token=access_token  # Include token in response for localStorage fallback
     )
 
 
@@ -733,7 +734,8 @@ async def verify_token(
     
     return AuthResponse(
         user=UserResponseSchema(id=user.id, email=user.email, created_at=user.created_at),
-        message="Authentication successful"
+        message="Authentication successful",
+        token=access_token  # Include token in response for localStorage fallback
     )
 
 

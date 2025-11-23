@@ -131,6 +131,7 @@ class UserResponse(BaseModel):
 class AuthResponse(BaseModel):
     user: UserResponse
     message: str = "Authentication successful"
+    token: Optional[str] = None  # Include token for localStorage fallback when cookies are blocked
 
 
 class ScenarioGroupEditorResponse(BaseModel):
