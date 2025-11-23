@@ -640,11 +640,15 @@ async def verify_link(
     # Match cookie expiration to token expiration (30 days default)
     # For cross-origin requests (Vercel frontend to EC2 backend), use samesite="none" with secure=True
     is_production = os.getenv("ENVIRONMENT") == "production"
+    
+    # For cross-origin cookies with samesite="none", do NOT set domain attribute
+    # The browser will send the cookie to the backend domain regardless of where the request originates
+    # IMPORTANT: secure=True is REQUIRED when samesite="none"
     response.set_cookie(
         key="session_token",
         value=access_token,
         httponly=True,
-        secure=is_production,  # HTTPS only in production
+        secure=is_production,  # HTTPS only in production (required for samesite="none")
         samesite="none" if is_production else "lax",  # Allow cross-origin cookies in production
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert minutes to seconds
     )
@@ -710,11 +714,15 @@ async def verify_token(
     # Match cookie expiration to token expiration (30 days default)
     # For cross-origin requests (Vercel frontend to EC2 backend), use samesite="none" with secure=True
     is_production = os.getenv("ENVIRONMENT") == "production"
+    
+    # For cross-origin cookies with samesite="none", do NOT set domain attribute
+    # The browser will send the cookie to the backend domain regardless of where the request originates
+    # IMPORTANT: secure=True is REQUIRED when samesite="none"
     response.set_cookie(
         key="session_token",
         value=access_token,
         httponly=True,
-        secure=is_production,  # HTTPS only in production
+        secure=is_production,  # HTTPS only in production (required for samesite="none")
         samesite="none" if is_production else "lax",  # Allow cross-origin cookies in production
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert minutes to seconds
     )

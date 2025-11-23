@@ -7,7 +7,7 @@ import './VerificationPage.css'
 export default function VerificationPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { checkAuth } = useAuth()
+  const { checkAuth, setUser } = useAuth()
   const token = searchParams.get('token')
   
   const [email, setEmail] = useState<string>('')
@@ -32,8 +32,14 @@ export default function VerificationPage() {
     setError(null)
 
     try {
-      await authApi.verifyLink(linkToken)
-      await checkAuth()
+      const authResponse = await authApi.verifyLink(linkToken)
+      // Use user from response directly to avoid immediate /auth/me call
+      if (authResponse.user) {
+        setUser(authResponse.user)
+      } else {
+        // Fallback to checkAuth if user not in response
+        await checkAuth()
+      }
       navigate('/study-builder')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to verify link')
@@ -64,8 +70,14 @@ export default function VerificationPage() {
     setError(null)
 
     try {
-      await authApi.verifyToken(email, verificationCode)
-      await checkAuth()
+      const authResponse = await authApi.verifyToken(email, verificationCode)
+      // Use user from response directly to avoid immediate /auth/me call
+      if (authResponse.user) {
+        setUser(authResponse.user)
+      } else {
+        // Fallback to checkAuth if user not in response
+        await checkAuth()
+      }
       navigate('/study-builder')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to verify code')

@@ -86,11 +86,13 @@
   align-items: center;
   gap: 1rem;
   margin-bottom: 2rem;
+  flex-wrap: wrap;
 }
 
 .study-responses-header h1 {
   margin: 0;
   font-size: 2rem;
+  flex: 1;
 }
 
 .back-button {
@@ -106,6 +108,27 @@
 
 .back-button:hover {
   background-color: #3a3a3a;
+}
+
+.print-button {
+  padding: 0.5rem 1rem;
+  background-color: #000;
+  color: white;
+  border: 2px solid white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.print-button:hover {
+  background-color: #333;
+  border-color: #fff;
 }
 
 .responses-section {
@@ -529,6 +552,79 @@
     font-size: 0.9rem;
     margin-bottom: 0.75rem;
     padding-bottom: 0.5rem;
+  }
+}
+
+/* Print styles */
+@media print {
+  .study-responses-page {
+    padding: 0;
+    background-color: white;
+    color: black;
+  }
+
+  .study-responses-nav {
+    display: none;
+  }
+
+  .study-responses-layout {
+    display: block;
+  }
+
+  .study-responses-container {
+    max-width: 100%;
+  }
+
+  .study-responses-header {
+    page-break-after: avoid;
+  }
+
+  .study-responses-header .back-button,
+  .study-responses-header .print-button {
+    display: none;
+  }
+
+  .responses-section,
+  .scenario-responses-group {
+    page-break-inside: avoid;
+    margin-bottom: 1.5rem;
+    background-color: white;
+    border: 1px solid #ccc;
+    padding: 1rem;
+  }
+
+  .responses-section h2,
+  .scenario-responses-group h3 {
+    color: black;
+    border-color: #ccc;
+  }
+
+  .question-response-group {
+    page-break-inside: avoid;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+  }
+
+  .heatmap-export-controls {
+    display: none;
+  }
+
+  /* Ensure text is readable in print */
+  .study-responses-page,
+  .study-responses-page * {
+    color: black !important;
+    background-color: white !important;
+  }
+
+  .study-responses-page .responses-section,
+  .study-responses-page .scenario-responses-group {
+    background-color: white;
+  }
+
+  /* Keep some visual separation */
+  .responses-section,
+  .scenario-responses-group {
+    border: 1px solid #ddd;
   }
 }
 
